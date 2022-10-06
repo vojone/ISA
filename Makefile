@@ -4,8 +4,8 @@
 APP_NAME = feedreader
 CFLAGS = -std=c99 -Wall -Wextra -pedantic -I/usr/include/libxml2
 CC = gcc
-SRCS = $(APP_NAME).c utils.c
-HEADERS = utils.h
+SRCS = $(APP_NAME).c utils.c cli.c
+HEADERS = utils.h cli.h
 LDLIBS = -lssl -lcrypto
 
 

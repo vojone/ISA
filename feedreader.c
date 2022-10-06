@@ -6,7 +6,9 @@
  * @date 6. 10. 2022
  */
 
+#include "feedreader.h"
+
 
 int main(int argc, char **argv) {
-    return 0;
+    return SUCCESS;
 }

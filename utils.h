@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 
 #define PROGNAME "feedreader"
@@ -19,6 +20,8 @@
 
 enum err_codes {
     SUCCESS,
+    USAGE_ERROR,
+    PATH_ERROR,
 };
 
 
@@ -28,7 +31,7 @@ enum err_codes {
  * @param err_code 
  * @param message 
  */
-void printerr(int err_code, const char *message);
+void printerr(int err_code, const char *message,...);
 
 /**
  * @brief Allocates string buffer

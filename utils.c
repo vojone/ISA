@@ -9,15 +9,18 @@
 #include "utils.h"
 
 
-void printerr(int err_code, const char *message) {
+void printerr(int err_code, const char *message_format,...) {
     char *err_str[] = {
         "Success",
+        "Usage error",
     };
 
     fprintf(stderr, "./%s: %s: ", PROGNAME, err_str[err_code]); //< TODO: Better message
 
-    if(message) {
-        fprintf(stderr, "%s", message);
+    if(message_format) {
+        va_list args;
+        va_start (args, message_format);
+        vfprintf(stderr, message_format, args);
     }
 
     fprintf(stderr, "\n");
