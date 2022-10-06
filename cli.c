@@ -20,6 +20,11 @@ typedef struct opt {
 } opt_t;
 
 
+void init_settings(settings_t *settings) {
+    memset(settings, 0, sizeof(settings_t));
+}
+
+
 void print_usage() {
     const char *usage_msg = 
         "USAGE: ./feedreader <URL|-f <feedfile>> [options]\n";
@@ -164,13 +169,12 @@ int parse_opts(int argc, char **argv, settings_t *settings) {
 
         cur_char_i++;
 
-        int ret;
+        int ret = SUCCESS;
         opt_t option = {.name = NULL, .flag = NULL, .arg = NULL};
-
-        if(current_opt[cur_char_i] == '-') {
+        if(current_opt[cur_char_i] == '-') { //< Second character is also '-' => it is long option
             ret = rec_lopt(current_opt, &cur_char_i, &option, settings);
         }
-        else {
+        else { //< Only first character is '-'
             ret = rec_opt(current_opt, &option, settings);
             cur_char_i++;
         }

@@ -6,5 +6,9 @@
  * @date 6. 10. 2022
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 #include "utils.h"
+#include "cli.h"

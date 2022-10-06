@@ -28,6 +28,8 @@ typedef struct settings {
 } settings_t;
 
 
+void init_settings(settings_t *settings);
+
 
 void print_usage();
 
