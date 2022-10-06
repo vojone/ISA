@@ -26,6 +26,71 @@ int validate_settings(settings_t *settings) {
 }
 
 
+
+int parse_feedfile(char *path, list_t *url_list) {
+    FILE *file_ptr = fopen(path, "r");
+    if(!file_ptr) {
+        printerr(FILE_ERROR, "%s", strerror(errno));
+        return FILE_ERROR;
+    }
+
+    string_t *buffer = new_string(INIT_STRING_SIZE);
+    if(!buffer) {
+        printerr(INTERNAL_ERROR, "");
+        return INTERNAL_ERROR;
+    }
+
+    int c, cur_len = 0;
+    bool is_cmnt = false;
+    while((c = fgetc(file_ptr)) != EOF) {
+        if(c == '\n') {
+            is_cmnt = false;
+        }
+
+        if(cur_len > 0 && c == '\n') {
+            list_el_t *new_url = new_element(buffer->str);
+            if(!new_url) {
+                string_dtor(buffer);
+                printerr(INTERNAL_ERROR, "");
+                return INTERNAL_ERROR;
+            }
+
+            list_append(url_list, new_url);
+            cur_len = 0;
+            erase_string(buffer);
+        }
+        else if((cur_len == 0 && c == '\n') || isspace(c) || is_cmnt) {
+            continue;
+        }
+        else if(c == '#' && cur_len == 0) {
+            is_cmnt = true;
+        }
+        else {
+            if(!app_char(buffer, c)) {
+                return INTERNAL_ERROR;
+            }
+
+            cur_len++;
+        }
+    }
+
+    #ifdef DEBUG //Prints all urls from url list
+    list_el_t *current = url_list->header;
+    while(current)
+    {
+        fprintf(stderr, "%s\n", current->string->str);
+        current = current->next;
+    }
+    #endif
+    
+
+    string_dtor(buffer);
+    fclose(file_ptr);
+
+    return SUCCESS;
+}
+
+
 int main(int argc, char **argv) {
     int ret_code = SUCCESS;
 
@@ -46,9 +111,29 @@ int main(int argc, char **argv) {
         return ret_code;
     }
 
-    
+    list_t url_list;
+    list_init(&url_list);
+
+    if(settings.feedfile) {
+        ret_code = parse_feedfile(settings.feedfile, &url_list);
+        if(ret_code != SUCCESS) {
+            list_dtor(&url_list);
+            return ret_code;
+        }
+    }
+    else if(settings.url) {
+        list_el_t *first = new_element(settings.url);
+        if(!first) {
+            printerr(INTERNAL_ERROR, "");
+            list_dtor(&url_list);
+            return INTERNAL_ERROR;
+        }
+
+        list_append(&url_list, first);
+    }
 
 
+    list_dtor(&url_list);
 
     return ret_code;
 }

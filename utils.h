@@ -17,12 +17,32 @@
 
 #define PROGNAME "feedreader"
 
+#define INIT_STRING_SIZE 32
+
 
 enum err_codes {
     SUCCESS,
     USAGE_ERROR,
-    PATH_ERROR,
+    FILE_ERROR,
+    INTERNAL_ERROR
 };
+
+
+typedef struct string {
+    char *str;
+    size_t len;
+} string_t;
+
+
+typedef struct list_el {
+    string_t *string;
+    struct list_el *next;
+} list_el_t;
+
+
+typedef struct list {
+    list_el_t *header;
+} list_t;
 
 
 /**
@@ -32,6 +52,30 @@ enum err_codes {
  * @param message 
  */
 void printerr(int err_code, const char *message,...);
+
+list_el_t *new_element(char *string_content);
+
+void list_init(list_t *list);
+
+void list_dtor(list_t *list);
+
+void list_append(list_t *list, list_el_t *new_element);
+
+void erase_string(string_t *string);
+
+string_t *app_char(string_t *dest, char c);
+
+string_t *set_string(string_t *dest, char *src);
+
+/**
+ * @brief 
+ * 
+ * @param len 
+ * @return string_t* 
+ */
+string_t *new_string(size_t len);
+
+void string_dtor(string_t *string);
 
 /**
  * @brief Allocates string buffer
