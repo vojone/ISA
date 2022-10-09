@@ -1,6 +1,7 @@
 /**
  * @file utils.c
- * @brief Src file of module with functions, that are used across the project
+ * @brief Src file of module with definitions of functions, that are used 
+ * across the project
  * 
  * @author Vojtěch Dvořák (xdvora3o)
  * @date 6. 10. 2022
@@ -14,6 +15,8 @@ void printerr(int err_code, const char *message_format,...) {
         "Success",
         "Usage error",
         "Error while opening file",
+        "Invalid URL",
+        "Connection error",
         "Internal error",
     };
 
@@ -42,10 +45,6 @@ void printw(const char *message_format,...) {
 }
 
 
-int hostname_validation(char *hostname) {
-    return 0;
-}
-
 void init_h_url(h_url_t *h_url) {
     for(int i = 0; i < RE_H_URL_NUM; i++) {
         h_url->h_url_parts[i] = NULL;
@@ -62,7 +61,6 @@ void h_url_dtor(h_url_t *h_url) {
 }
 
 
-
 int prepare_patterns(regex_t *regexes) {
     //Patterns are based on RFC3986
     char *patterns[] = {
@@ -74,7 +72,7 @@ int prepare_patterns(regex_t *regexes) {
         "\\?([" UNRESERVED "|" SUBDELIMS "|[:@/?]|(" PCTENCODED "))*",
         "#(" UNRESERVED "|" SUBDELIMS "|[:@/?]|(" PCTENCODED "))*"
     };
-    //-----------------------------
+    //End of part base on RFC3986
 
     for(int i = 0; i < RE_H_URL_NUM; i++) {
         if(regcomp(&(regexes[i]), patterns[i], REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
@@ -93,7 +91,11 @@ void free_all_patterns(regex_t *regexes) {
     }
 }
 
-
+/**
+ * Because is not strict parsing of url, url scheme is able to lack a scheme,
+ * also user info is deprecated but it is only ignored (because of some 
+ * possible edge cases it does not result in error)
+ */
 int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
     if(int_err) {
         printerr(INTERNAL_ERROR, "Error while parsing URL!");
@@ -101,11 +103,11 @@ int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
     }
 
     if(res[HOST] == REG_NOMATCH || is_inv) { //< Host was not found in URL
-        printerr(INTERNAL_ERROR, "Invalid URL '%s'!", url);
+        printerr(INVALID_URL, "'%s'!", url);
         return INVALID_URL;
     }
 
-    if(res[SCHEME_PART] == REG_NOMATCH) {
+    if(res[SCHEME_PART] == REG_NOMATCH) { //< Non-strict parsing
         printw("Scheme part of URL '%s' was not found! It will be set to default!", url);
     }
 
@@ -117,37 +119,49 @@ int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
 }
 
 int fix_url(h_url_t *p_url, char* def_scheme_part_str) {
+    string_t **url_parts = p_url->h_url_parts;
+
     if(!p_url->h_url_parts[SCHEME_PART]) {
         size_t len = strlen(def_scheme_part_str);
 
         p_url->h_url_parts[SCHEME_PART] = new_string(len);
-        if(p_url->h_url_parts[SCHEME_PART]) {
+        if(!p_url->h_url_parts[SCHEME_PART]) {
             return INTERNAL_ERROR;
         }
 
-        set_stringn(p_url->h_url_parts[SCHEME_PART], def_scheme_part_str, len);
+        set_stringn(url_parts[SCHEME_PART], def_scheme_part_str, len);
     }
 
-    if(!p_url->h_url_parts[PATH]) {
-        char *path = "/";
-        size_t len = strlen(path);
+    if(!url_parts[PORT_PART]) { //< If port number was not set, set it by scheme sign (then must be determined default port number for given service)
+        size_t len = strlen(url_parts[SCHEME_PART]->str);
 
-        p_url->h_url_parts[PATH] = new_string(len);
-        if(p_url->h_url_parts[PATH]) {
+        url_parts[PORT_PART] = new_string(len);
+        if(!url_parts[PORT_PART]) {
             return INTERNAL_ERROR;
         }
 
-        set_stringn(p_url->h_url_parts[PATH], path, len);
+        set_stringn(url_parts[PORT_PART], url_parts[SCHEME_PART]->str, len);
+        trunc_string(url_parts[PORT_PART], -((int)strlen("://")));
+
+        #ifdef DEBUG
+            fprintf(stderr, "port part: %s\n", url_parts[PORT_PART]->str);
+        #endif
+    }
+    else {
+        trunc_string(url_parts[PORT_PART], ((int)strlen(":")));
     }
 
     return SUCCESS;
 }
 
 
-/**
- * Because is not strict parsing of url, url scheme is able to lack a scheme,
- * also user info is deprecated but (because of some possible edge cases it does not result in error)
-*/
+void init_res_arr(int *res) {
+    for(int i = 0; i < RE_H_URL_NUM; i++) {
+        res[i] = REG_NOMATCH;
+    }
+}
+
+
 int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
     regex_t regexes[RE_H_URL_NUM];
     regmatch_t regmatch[RE_H_URL_NUM];
@@ -157,7 +171,8 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
         return ret;
     }
 
-    int glob_st = 0; //< Index from which the searching begins
+    init_res_arr(res);
+    size_t glob_st = 0; //< Index from which the searching begins
     bool is_invalid = false, int_err_occ = false;
     for(int i = 0; i < RE_H_URL_NUM && !is_invalid && !int_err_occ; i++) {
         res[i] = regexec(&regexes[i], &(url[glob_st]), 1, &(regmatch[i]), 0); //< Perform searching in the rest of the URL
@@ -165,6 +180,7 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
         if(res[i] == 0) { //< Pattern was found in the rest of URL
             int st = regmatch[i].rm_so, end = regmatch[i].rm_eo;
             if(st != 0) { //< Next URL part is not immediate succesor of previous part
+                res[i] = REG_NOMATCH;
                 is_invalid = true;
                 break;
             }
@@ -179,16 +195,20 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
             glob_st += regmatch[i].rm_eo;
         }
     }
+    if(glob_st != strlen(url)) { //< There is the rest of URL, that was not parsed
+        is_invalid = true;
+    }
 
     free_all_patterns(regexes);
 
-    #ifdef DEBUG
-    fprintf(stderr, "i\tres\tstart\tend\n");
-    for(int i = 0; i < RE_H_URL_NUM; i++) {
-        fprintf(stderr, "%d\t%d\t", i, res[i]);
-        if(res[i] == 0) fprintf(stderr, "%d\t%d\t%s", regmatch[i].rm_so, regmatch[i].rm_eo, p_url->h_url_parts[i]->str);
-        fprintf(stderr, "\n");
-    }
+    #ifdef DEBUG //Prints the results of parsing
+        //fprintf(stderr, "Strlen(url): %ld End of parsed part: %ld\n", strlen(url), glob_st);
+        fprintf(stderr, "i\tres\tstart\tend\n");
+        for(int i = 0; i < RE_H_URL_NUM; i++) {
+            fprintf(stderr, "%d\t%d\t", i, res[i]);
+            if(res[i] == 0) fprintf(stderr, "%d\t%d\t%s", regmatch[i].rm_so, regmatch[i].rm_eo, p_url->h_url_parts[i]->str);
+            fprintf(stderr, "\n");
+        }
     #endif
 
     if((ret = res_url(is_invalid, int_err_occ, res, p_url, url)) != SUCCESS) { //< Resolving parsing results
@@ -202,11 +222,11 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
 }
 
 
-char *new_str(size_t len) {
-    char *str = (char *)malloc(sizeof(char)*len);
+char *new_str(size_t size) {
+    char *str = (char *)malloc(sizeof(char)*size);
     
     if(str) {
-        memset(str, 0, len);
+        memset(str, 0, size);
     }
 
     return str;
@@ -270,19 +290,19 @@ void list_append(list_t *list, list_el_t *new_element) {
 }
 
 
-string_t *new_string(size_t len) {
+string_t *new_string(size_t size) {
     string_t *new_string = (string_t *)malloc(sizeof(string_t));
     if(!new_string) {
         return NULL;
     }
 
-    new_string->str = new_str(len);
+    new_string->str = new_str(size);
     if(!new_string->str) {
         free(new_string);
         return NULL;
     }
 
-    new_string->len = len;
+    new_string->size = size;
 
     return new_string;
 }
@@ -292,7 +312,7 @@ string_t *ext_string(string_t *string) {
     const int coef = 2;
 
     char *tmp = string->str;
-    string->str = new_str(string->len*coef);
+    string->str = new_str(string->size*coef);
     if(!string->str) {
         free(tmp);
         return NULL;
@@ -301,18 +321,33 @@ string_t *ext_string(string_t *string) {
     set_string(string, tmp);
     free(tmp);
 
-    string->len *= coef;
+    string->size *= coef;
 
     return string;
 } 
 
 
 void erase_string(string_t *string) {
-    memset(string->str, 0, string->len);
+    memset(string->str, 0, string->size);
 }
 
+
+void trunc_string(string_t *string, int n) {
+    char *str = string->str;
+
+    int trunc_n = ABS(n) > string->size ? string->size : ABS(n);
+
+    if(n > 0) {
+        strncpy(str, &(str[trunc_n]), string->size - trunc_n);
+    }
+    else {
+        memset(&(str[string->size - trunc_n]), 0, trunc_n);
+    }
+}
+
+
 string_t *app_char(string_t *dest, char c) {
-    if(strlen(dest->str) >= dest->len - 1) {
+    if(strlen(dest->str) >= dest->size - 1) {
         if(!ext_string(dest)) {
             return NULL;
         }    
@@ -325,22 +360,22 @@ string_t *app_char(string_t *dest, char c) {
 
 
 string_t *set_string(string_t *dest, char *src) {
-    memset(dest->str, 0, dest->len);
+    memset(dest->str, 0, dest->size);
 
-    while(dest->len < strlen(src)) {
+    while(dest->size < strlen(src)) {
         if(!ext_string(dest)) {
             return NULL;
         }
     }
 
-    strncpy(dest->str, src, dest->len);
+    strncpy(dest->str, src, dest->size);
 
     return dest;
 }
 
 
 void set_stringn(string_t *dest, char *src, size_t n) {
-    memset(dest->str, 0, dest->len);
+    memset(dest->str, 0, dest->size);
 
     strncpy(dest->str, src, n);
 }

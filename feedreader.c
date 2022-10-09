@@ -23,7 +23,7 @@ int validate_settings(settings_t *settings) {
         return USAGE_ERROR;
     }
     else if(settings->url && settings->feedfile) {
-        printerr(USAGE_ERROR, "Specified feedfile and URL in the same time!");
+        printerr(USAGE_ERROR, "Specified feedfile and URL at the same time!");
         print_usage();
         return USAGE_ERROR;
     }
@@ -91,7 +91,7 @@ int parse_feedfile(char *path, list_t *url_list) {
 
     string_t *buffer = new_string(INIT_STRING_SIZE);
     if(!buffer) {
-        printerr(INTERNAL_ERROR, "");
+        printerr(INTERNAL_ERROR, "Unable to allocate buffer for parsing feedfile!");
         return INTERNAL_ERROR;
     }
 
@@ -135,8 +135,8 @@ void openssl_init() {
 //
 
 
-int get_feed(list_t *list, settings_t *settings) {
-    list_el_t *current = list->header;
+int get_feed(list_t *url_list, settings_t *settings) {
+    list_el_t *current = url_list->header;
     int ret;
 
     h_url_t parsed_url;
@@ -151,26 +151,28 @@ int get_feed(list_t *list, settings_t *settings) {
             return ret;
         }
 
-        BIO *bio = BIO_new_connect(parsed_url.h_url_parts[HOST]->str);
+        BIO *bio = BIO_new(BIO_s_connect());
         if(!bio) {
             printerr(INTERNAL_ERROR, "Unable to allocate BIO!");
             h_url_dtor(&parsed_url);
             return INTERNAL_ERROR;
         }
 
-        if(BIO_set_conn_port(bio, "http") <= 0) {
-            printerr(INTERNAL_ERROR, "Unable to set port to BIO!");
-            h_url_dtor(&parsed_url);
-            BIO_free_all(bio);
-            return INTERNAL_ERROR;
-        }
+        BIO_set_conn_hostname(bio, parsed_url.h_url_parts[HOST]->str); //< Always returns 1 -> no need to check retval
+        BIO_set_conn_port(bio, parsed_url.h_url_parts[PORT_PART]->str); //< -||-
 
         if(BIO_do_connect(bio) <= 0) {
-            printerr(INTERNAL_ERROR, "Unable to connect to the '%s'!", url);
+            printerr(CONNECTION_ERROR, "Cannot connect to the '%s'!", url);
+            #ifdef DEBUG
+                fprintf(stderr, "Details:\n");
+                ERR_print_errors_fp(stderr);
+            #endif
             h_url_dtor(&parsed_url);
             BIO_free_all(bio);
-            return INTERNAL_ERROR;
+            return CONNECTION_ERROR;
         }
+
+        
 
         BIO_free_all(bio);
 

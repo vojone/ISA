@@ -21,6 +21,7 @@
 #define PROGNAME "feedreader"
 
 #define INIT_STRING_SIZE 32
+#define INIT_NET_BUFF_SIZE 2048
 
 #define DEBUG
 
@@ -29,14 +30,15 @@ enum err_codes {
     SUCCESS,
     USAGE_ERROR,
     FILE_ERROR,
+    INVALID_URL,
+    CONNECTION_ERROR,
     INTERNAL_ERROR,
-    INVALID_URL
 };
 
 
 typedef struct string {
     char *str;
-    size_t len;
+    size_t size;
 } string_t;
 
 
@@ -55,12 +57,13 @@ enum re_h_url_indexes {
     USER_INFO_PART, //< see RFC3986 - userinfo part in http(s) is deprecated due to RFC9110)
     HOST, //< IP-literal / IPv4address / reg-name
     //IPVFUTURE, //< Just to tell user, that this format is not supported
-    PORT_PART, //< :\d*
+    PORT_PART, //< : *DIGIT
     PATH, //< *( "/" segment )
-    QUERY, //<
-    FRAG_PART, //<
-    RE_H_URL_NUM,
+    QUERY, //< ? *( pchar / "/" / "?" )
+    FRAG_PART, //< # *( pchar / "/" / "?" )
+    RE_H_URL_NUM, //< Maximum amount of tokens in URL 
 };
+
 
 typedef struct h_url {
     string_t *h_url_parts[RE_H_URL_NUM];
@@ -72,25 +75,27 @@ typedef struct h_url {
 //Based on RFC3986
 #define HEXDIG "[0-9a-f]"
 #define H16 HEXDIG "{4}"
-#define LS32 H16 ":" H16 "|" IPV4ADDRESS
+#define LS32 "(" H16 ":" H16 ")|" IPV4ADDRESS
 
 #define UNRESERVED "[a-z0-9\\-\\._~]"
 #define SUBDELIMS "[@!\\$&'()*+,;=]"
 #define PCTENCODED "%" HEXDIG HEXDIG
 #define DECOCTED "[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-5]{2}"
 #define IPV4ADDRESS DECOCTED "\\." DECOCTED "\\." DECOCTED "\\." DECOCTED
-#define IPV6ADDRESS "(" H16 ":){6}" LS32 "|"\
-"::" "(" H16 ":){5}" LS32 "|"\
-"(" H16 ")?::(" H16 ":){4}" LS32\
-"((" H16 ":){,1}" H16 ")?::(" H16 ":){3}" LS32\
-"((" H16 ":){,2}" H16 ")?::(" H16 ":){2}" LS32\
-"((" H16 ":){,3}" H16 ")?::(" H16 ":)" LS32\
-"((" H16 ":){,4}" H16 ")?::" LS32\
-"((" H16 ":){,5}" H16 ")?::" H16\
-"((" H16 ":){,6}" H16 ")?::"
+#define IPV6ADDRESS "(((" H16 ":){6}" LS32 ")|"\
+"(::(" H16 ":){5}" LS32 ")|"\
+"((" H16 ")?::(" H16 ":){4}" LS32 ")|"\
+"(((" H16 ":){,1}" H16 ")?::(" H16 ":){3}" LS32 ")|"\
+"(((" H16 ":){,2}" H16 ")?::(" H16 ":){2}" LS32 ")|"\
+"(((" H16 ":){,3}" H16 ")?::(" H16 ":)" LS32 ")|"\
+"(((" H16 ":){,4}" H16 ")?::" LS32 ")|"\
+"(((" H16 ":){,5}" H16 ")?::" H16 ")|"\
+"(((" H16 ":){,6}" H16 ")?::))"
 #define REGNAME "((" UNRESERVED ")|(" SUBDELIMS ")|(" PCTENCODED "))+"
 //End of part base od RFC3986
 
+
+#define ABS(x) (unsigned int)((x > 0) ? x : -x)
 
 /**
  * @brief Prints formated error message to the output
@@ -118,6 +123,8 @@ void list_append(list_t *list, list_el_t *new_element);
 
 void erase_string(string_t *string);
 
+void trunc_string(string_t *string, int n);
+
 string_t *app_char(string_t *dest, char c);
 
 string_t *set_string(string_t *dest, char *src);
@@ -127,20 +134,20 @@ void set_stringn(string_t *dest, char *src, size_t n);
 /**
  * @brief 
  * 
- * @param len 
+ * @param size 
  * @return string_t* 
  */
-string_t *new_string(size_t len);
+string_t *new_string(size_t size);
 
 void string_dtor(string_t *string);
 
 /**
  * @brief Allocates string buffer
  * 
- * @param len Capacity of the new buffer
+ * @param size Capacity of the new buffer
  * @return Pointer to the newly allocated buffer or NULL (must be checked) 
  */
-char *new_str(size_t len);
+char *new_str(size_t size);
 
 /**
  * @brief Moves the given pointer n places from the start of the string
