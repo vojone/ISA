@@ -8,7 +8,7 @@
 
 #include "feedreader.h"
 
-
+#define DEBUG
 
 /**
  * @brief Checks if given configuration of settings is valid and eventually prints error msg
@@ -19,6 +19,11 @@
 int validate_settings(settings_t *settings) {
     if(!settings->url && !settings->feedfile) {
         printerr(USAGE_ERROR, "URL or feedfile required!");
+        print_usage();
+        return USAGE_ERROR;
+    }
+    else if(settings->url && settings->feedfile) {
+        printerr(USAGE_ERROR, "Specified feedfile and URL in the same time!");
         print_usage();
         return USAGE_ERROR;
     }
@@ -105,10 +110,11 @@ int parse_feedfile(char *path, list_t *url_list) {
     }
 
     #ifdef DEBUG //Prints all urls from url list
+    fprintf(stderr, "Found\n");
     list_el_t *current = url_list->header;
     while(current)
     {
-        fprintf(stderr, "%s\n", current->string->str);
+        fprintf(stderr, "url: %s\n", current->string->str);
         current = current->next;
     }
     #endif
@@ -117,6 +123,61 @@ int parse_feedfile(char *path, list_t *url_list) {
     string_dtor(buffer);
     fclose(file_ptr);
 
+    return SUCCESS;
+}
+
+//The process of initializing features of openssl library is based on https://developer.ibm.com/tutorials/l-openssl/
+void openssl_init() {
+    SSL_load_error_strings();
+    ERR_load_BIO_strings();
+    OpenSSL_add_all_algorithms();
+}
+//
+
+
+int get_feed(list_t *list, settings_t *settings) {
+    list_el_t *current = list->header;
+    int ret;
+
+    h_url_t parsed_url;
+    init_h_url(&parsed_url);
+
+    openssl_init();
+    while(current) {
+        char *url = current->string->str;
+
+        if((ret = parse_h_url(url, &parsed_url, "https://")) != SUCCESS) {
+            h_url_dtor(&parsed_url);
+            return ret;
+        }
+
+        BIO *bio = BIO_new_connect(parsed_url.h_url_parts[HOST]->str);
+        if(!bio) {
+            printerr(INTERNAL_ERROR, "Unable to allocate BIO!");
+            h_url_dtor(&parsed_url);
+            return INTERNAL_ERROR;
+        }
+
+        if(BIO_set_conn_port(bio, "http") <= 0) {
+            printerr(INTERNAL_ERROR, "Unable to set port to BIO!");
+            h_url_dtor(&parsed_url);
+            BIO_free_all(bio);
+            return INTERNAL_ERROR;
+        }
+
+        if(BIO_do_connect(bio) <= 0) {
+            printerr(INTERNAL_ERROR, "Unable to connect to the '%s'!", url);
+            h_url_dtor(&parsed_url);
+            BIO_free_all(bio);
+            return INTERNAL_ERROR;
+        }
+
+        BIO_free_all(bio);
+
+        current = current->next;
+    }
+
+    h_url_dtor(&parsed_url);
     return SUCCESS;
 }
 
@@ -162,6 +223,11 @@ int main(int argc, char **argv) {
         list_append(&url_list, first);
     }
 
+    ret_code = get_feed(&url_list, &settings);
+    if(ret_code != SUCCESS) {
+        list_dtor(&url_list);
+        return ret_code;
+    }
 
     list_dtor(&url_list);
 

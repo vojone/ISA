@@ -13,18 +13,24 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <regex.h>
+#include <stdbool.h>
+#include <sys/types.h>
 
 
 #define PROGNAME "feedreader"
 
 #define INIT_STRING_SIZE 32
 
+#define DEBUG
+
 
 enum err_codes {
     SUCCESS,
     USAGE_ERROR,
     FILE_ERROR,
-    INTERNAL_ERROR
+    INTERNAL_ERROR,
+    INVALID_URL
 };
 
 
@@ -44,6 +50,47 @@ typedef struct list {
     list_el_t *header;
 } list_t;
 
+enum re_h_url_indexes {
+    SCHEME_PART, //< (http|https)://
+    USER_INFO_PART, //< see RFC3986 - userinfo part in http(s) is deprecated due to RFC9110)
+    HOST, //< IP-literal / IPv4address / reg-name
+    //IPVFUTURE, //< Just to tell user, that this format is not supported
+    PORT_PART, //< :\d*
+    PATH, //< *( "/" segment )
+    QUERY, //<
+    FRAG_PART, //<
+    RE_H_URL_NUM,
+};
+
+typedef struct h_url {
+    string_t *h_url_parts[RE_H_URL_NUM];
+} h_url_t;
+
+
+//http-URI = "http" "://" authority path-abempty [ "?" query ] ("#" [fragment]) (see RFC9110)
+
+//Based on RFC3986
+#define HEXDIG "[0-9a-f]"
+#define H16 HEXDIG "{4}"
+#define LS32 H16 ":" H16 "|" IPV4ADDRESS
+
+#define UNRESERVED "[a-z0-9\\-\\._~]"
+#define SUBDELIMS "[@!\\$&'()*+,;=]"
+#define PCTENCODED "%" HEXDIG HEXDIG
+#define DECOCTED "[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-5]{2}"
+#define IPV4ADDRESS DECOCTED "\\." DECOCTED "\\." DECOCTED "\\." DECOCTED
+#define IPV6ADDRESS "(" H16 ":){6}" LS32 "|"\
+"::" "(" H16 ":){5}" LS32 "|"\
+"(" H16 ")?::(" H16 ":){4}" LS32\
+"((" H16 ":){,1}" H16 ")?::(" H16 ":){3}" LS32\
+"((" H16 ":){,2}" H16 ")?::(" H16 ":){2}" LS32\
+"((" H16 ":){,3}" H16 ")?::(" H16 ":)" LS32\
+"((" H16 ":){,4}" H16 ")?::" LS32\
+"((" H16 ":){,5}" H16 ")?::" H16\
+"((" H16 ":){,6}" H16 ")?::"
+#define REGNAME "((" UNRESERVED ")|(" SUBDELIMS ")|(" PCTENCODED "))+"
+//End of part base od RFC3986
+
 
 /**
  * @brief Prints formated error message to the output
@@ -52,6 +99,14 @@ typedef struct list {
  * @param message 
  */
 void printerr(int err_code, const char *message,...);
+
+void printw(const char *message,...);
+
+void init_h_url(h_url_t *h_url);
+
+void h_url_dtor(h_url_t *h_url);
+
+int parse_h_url(char *url, h_url_t *parsed_url, char* default_scheme_str);
 
 list_el_t *new_element(char *string_content);
 
@@ -66,6 +121,8 @@ void erase_string(string_t *string);
 string_t *app_char(string_t *dest, char c);
 
 string_t *set_string(string_t *dest, char *src);
+
+void set_stringn(string_t *dest, char *src, size_t n);
 
 /**
  * @brief 

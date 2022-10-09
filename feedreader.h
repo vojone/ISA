@@ -13,6 +13,11 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <openssl/bio.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+
 #include "utils.h"
 #include "cli.h"
 
