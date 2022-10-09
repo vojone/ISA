@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
@@ -20,4 +21,7 @@
 
 #include "utils.h"
 #include "cli.h"
+
+#define REQ_TIME_INTERVAL_NS 5e8
+#define MAX_ATTEMPT_NUM 5
 

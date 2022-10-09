@@ -96,6 +96,8 @@ void free_all_patterns(regex_t *regexes) {
  * also user info is deprecated but it is only ignored (because of some 
  * possible edge cases it does not result in error)
  */
+
+//TODO (RFC1123)
 int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
     if(int_err) {
         printerr(INTERNAL_ERROR, "Error while parsing URL!");
@@ -103,7 +105,7 @@ int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
     }
 
     if(res[HOST] == REG_NOMATCH || is_inv) { //< Host was not found in URL
-        printerr(INVALID_URL, "'%s'!", url);
+        printerr(INVALID_URL, "Bad format of URL '%s'!", url);
         return INVALID_URL;
     }
 
@@ -118,13 +120,13 @@ int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
     return SUCCESS;
 }
 
-int fix_url(h_url_t *p_url, char* def_scheme_part_str) {
+int normalize_url(h_url_t *p_url, char* def_scheme_part_str) {
     string_t **url_parts = p_url->h_url_parts;
 
-    if(!p_url->h_url_parts[SCHEME_PART]) {
+    if(!p_url->h_url_parts[SCHEME_PART]) { //< If scheme is missing, it does not necessary mean error, it is just set to default scheme 
         size_t len = strlen(def_scheme_part_str);
 
-        p_url->h_url_parts[SCHEME_PART] = new_string(len);
+        p_url->h_url_parts[SCHEME_PART] = new_string(len + 1);
         if(!p_url->h_url_parts[SCHEME_PART]) {
             return INTERNAL_ERROR;
         }
@@ -135,22 +137,37 @@ int fix_url(h_url_t *p_url, char* def_scheme_part_str) {
     if(!url_parts[PORT_PART]) { //< If port number was not set, set it by scheme sign (then must be determined default port number for given service)
         size_t len = strlen(url_parts[SCHEME_PART]->str);
 
-        url_parts[PORT_PART] = new_string(len);
+        url_parts[PORT_PART] = new_string(len + 1);
         if(!url_parts[PORT_PART]) {
             return INTERNAL_ERROR;
         }
 
         set_stringn(url_parts[PORT_PART], url_parts[SCHEME_PART]->str, len);
-        trunc_string(url_parts[PORT_PART], -((int)strlen("://")));
-
-        #ifdef DEBUG
-            fprintf(stderr, "port part: %s\n", url_parts[PORT_PART]->str);
-        #endif
+        trunc_string(url_parts[PORT_PART], -((int)strlen("://"))); //< Remove :// from end
     }
     else {
-        trunc_string(url_parts[PORT_PART], ((int)strlen(":")));
+        trunc_string(url_parts[PORT_PART], ((int)strlen(":"))); //< Remove : from start
     }
 
+    if(!url_parts[PATH]) { //< If path is not set (which is quite often situation), it is set to default path "/"
+        size_t len = strlen("/");
+
+        url_parts[PATH] = new_string(len + 1);
+        if(!url_parts[PATH]) {
+            return INTERNAL_ERROR;
+        }
+
+        set_stringn(url_parts[PATH], "/", len);
+    }
+
+    #ifdef DEBUG //Prints all parts of normalized url
+        fprintf(stderr, "Normalized url parts\ni\tstr\n");
+        for(int i = 0; i < RE_H_URL_NUM; i++) {
+            fprintf(stderr, "%d\t%s\n", i, p_url->h_url_parts[i] ? p_url->h_url_parts[i]->str : NULL);
+        }
+        fprintf(stderr, "\n");
+    #endif
+ 
     return SUCCESS;
 }
 
@@ -209,12 +226,13 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
             if(res[i] == 0) fprintf(stderr, "%d\t%d\t%s", regmatch[i].rm_so, regmatch[i].rm_eo, p_url->h_url_parts[i]->str);
             fprintf(stderr, "\n");
         }
+        fprintf(stderr, "\n");
     #endif
 
     if((ret = res_url(is_invalid, int_err_occ, res, p_url, url)) != SUCCESS) { //< Resolving parsing results
         return ret;
     }
-    if((ret = fix_url(p_url, def_scheme_part_str)) != SUCCESS) { //< Perform auto fixes of URL
+    if((ret = normalize_url(p_url, def_scheme_part_str)) != SUCCESS) { //< Perform auto fixes of URL
         return ret;
     }
 
@@ -225,8 +243,8 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
 char *new_str(size_t size) {
     char *str = (char *)malloc(sizeof(char)*size);
     
-    if(str) {
-        memset(str, 0, size);
+    if(str) { 
+        memset(str, 0, size); //< Initialization of allocated memory 
     }
 
     return str;
@@ -291,20 +309,20 @@ void list_append(list_t *list, list_el_t *new_element) {
 
 
 string_t *new_string(size_t size) {
-    string_t *new_string = (string_t *)malloc(sizeof(string_t));
-    if(!new_string) {
+    string_t *new_string_ = (string_t *)malloc(sizeof(string_t));
+    if(!new_string_) {
         return NULL;
     }
 
-    new_string->str = new_str(size);
-    if(!new_string->str) {
-        free(new_string);
+    new_string_->str = new_str(size);
+    if(!new_string_->str) {
+        free(new_string_);
         return NULL;
     }
 
-    new_string->size = size;
+    new_string_->size = size;
 
-    return new_string;
+    return new_string_;
 }
 
 
@@ -338,10 +356,12 @@ void trunc_string(string_t *string, int n) {
     int trunc_n = ABS(n) > string->size ? string->size : ABS(n);
 
     if(n > 0) {
-        strncpy(str, &(str[trunc_n]), string->size - trunc_n);
+        for(int i = 0; (unsigned)(trunc_n + i) < string->size; i++) {
+            str[i] = str[trunc_n + i]; //< Move characters to beginning to remove characters at the begining 
+        }
     }
     else {
-        memset(&(str[string->size - trunc_n]), 0, trunc_n);
+        memset(&(str[string->size - trunc_n - 1]), 0, trunc_n); //< Remove characters from the end (replace them by '\0')
     }
 }
 

@@ -2,7 +2,7 @@
 # Author: Vojtěch Dvořák
 
 APP_NAME = feedreader
-CFLAGS = -std=c99 -Wall -Wextra -pedantic -I/usr/include/libxml2
+CFLAGS = -std=gnu11 -Wall -Wextra -pedantic -I/usr/include/libxml2
 CC = gcc
 SRCS = $(APP_NAME).c utils.c cli.c
 HEADERS = utils.h cli.h

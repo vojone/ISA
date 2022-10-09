@@ -21,7 +21,7 @@
 #define PROGNAME "feedreader"
 
 #define INIT_STRING_SIZE 32
-#define INIT_NET_BUFF_SIZE 2048
+#define INIT_NET_BUFF_SIZE 512
 
 #define DEBUG
 

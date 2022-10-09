@@ -92,6 +92,7 @@ int parse_feedfile(char *path, list_t *url_list) {
     string_t *buffer = new_string(INIT_STRING_SIZE);
     if(!buffer) {
         printerr(INTERNAL_ERROR, "Unable to allocate buffer for parsing feedfile!");
+        fclose(file_ptr);
         return INTERNAL_ERROR;
     }
 
@@ -99,12 +100,14 @@ int parse_feedfile(char *path, list_t *url_list) {
     bool is_cmnt = false;
     while((c = fgetc(file_ptr)) != EOF) {
         if((ret = proc_char(c, buffer, url_list, &len, &is_cmnt)) != SUCCESS) {
+            fclose(file_ptr);
             return ret;
         }
     }
 
     if(len > 0) {
         if((ret = move_to_list(buffer, url_list)) != SUCCESS) {
+            fclose(file_ptr);
             return ret;
         }
     }
@@ -132,7 +135,45 @@ void openssl_init() {
     ERR_load_BIO_strings();
     OpenSSL_add_all_algorithms();
 }
-//
+//End of the part based on https://developer.ibm.com/tutorials/l-openssl/
+
+
+int send_request(BIO *bio, h_url_t *p_url, char *url) {
+    int ret, attempt_num = 0;
+
+    const struct timespec req = { 
+        .tv_nsec = REQ_TIME_INTERVAL_NS, 
+        .tv_sec = 0
+    };
+    struct timespec rem;
+
+    char request_b[INIT_NET_BUFF_SIZE];
+    snprintf(request_b, INIT_NET_BUFF_SIZE, 
+        "GET %s HTTP/1.1\r\n"
+        "Host: %s\r\n" //< Mandatory due to RFC2616
+        "Connection: close\r\n" //< Connection will be closed after completition of the response
+        "User-Agent: ISAFeedReader/1.0\r\n" //< Just to better filtering from the other traffic
+        "\r\n",
+        p_url->h_url_parts[PATH]->str, 
+        p_url->h_url_parts[HOST]->str);
+
+    while((ret = BIO_write(bio, request_b, strlen(request_b))) <= 0) {
+        if(!BIO_should_retry(bio) || attempt_num >= MAX_ATTEMPT_NUM) { //< Checking if write should be repeated (in some cases is should be repeated even without SSL due to docs)
+            printerr(CONNECTION_ERROR, "Unable to send request to the '%s'!", url);
+            return CONNECTION_ERROR;
+        }
+        else {
+            if(nanosleep(&req, &rem) < 0) { //Works only with gnu* standard
+                printerr(INTERNAL_ERROR, "%s", strerror(errno));
+                return INTERNAL_ERROR;
+            }
+        }
+
+        attempt_num++;
+    }
+
+    return SUCCESS;
+}
 
 
 int get_feed(list_t *url_list, settings_t *settings) {
@@ -171,8 +212,8 @@ int get_feed(list_t *url_list, settings_t *settings) {
             BIO_free_all(bio);
             return CONNECTION_ERROR;
         }
-
         
+        send_request(bio, &parsed_url, url);
 
         BIO_free_all(bio);
 
@@ -217,7 +258,7 @@ int main(int argc, char **argv) {
     else if(settings.url) {
         list_el_t *first = new_element(settings.url);
         if(!first) {
-            printerr(INTERNAL_ERROR, "");
+            printerr(INTERNAL_ERROR, "Unable to allocate new element for url list!");
             list_dtor(&url_list);
             return INTERNAL_ERROR;
         }
