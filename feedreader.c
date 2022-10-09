@@ -68,8 +68,7 @@ int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
         *is_cmnt = true;
     }
     else {
-        if(!app_char(buff, c)) {
-            string_dtor(buff);
+        if(!(buff = app_char(&buff, c))) {
             printerr(INTERNAL_ERROR, "");
             return INTERNAL_ERROR;
         }
@@ -159,11 +158,11 @@ int send_request(BIO *bio, h_url_t *p_url, char *url) {
 
     while((ret = BIO_write(bio, request_b, strlen(request_b))) <= 0) {
         if(!BIO_should_retry(bio) || attempt_num >= MAX_ATTEMPT_NUM) { //< Checking if write should be repeated (in some cases is should be repeated even without SSL due to docs)
-            printerr(CONNECTION_ERROR, "Unable to send request to the '%s'!", url);
-            return CONNECTION_ERROR;
+            printerr(COMMUNICATION_ERROR, "Unable to send request to the '%s'!", url);
+            return COMMUNICATION_ERROR;
         }
         else {
-            if(nanosleep(&req, &rem) < 0) { //Works only with gnu* standard
+            if(nanosleep(&req, &rem) < 0) { //Needs gnu* standard
                 printerr(INTERNAL_ERROR, "%s", strerror(errno));
                 return INTERNAL_ERROR;
             }
@@ -176,52 +175,208 @@ int send_request(BIO *bio, h_url_t *p_url, char *url) {
 }
 
 
-int get_feed(list_t *url_list, settings_t *settings) {
-    list_el_t *current = url_list->header;
+int rec_response(BIO *bio, string_t *resp_b, char *url) {
+    int ret = 0, attempt_num = 0;
+
+    const struct timespec req = { 
+        .tv_nsec = REQ_TIME_INTERVAL_NS, 
+        .tv_sec = 0
+    };
+    struct timespec rem;
+
+    size_t emp_size = 0, last_size = 0, total_b = 0;
+    while(last_size == total_b) { //< Extend buffer until whole response don't fit in
+        emp_size = resp_b->size - last_size;
+        while((ret = BIO_read(bio, &(resp_b->str[total_b]), emp_size)) <= 0) {
+            if(!BIO_should_read(bio) || attempt_num >= MAX_ATTEMPT_NUM) { //< Checking if read should be repeated, but is BIO_should_read returns false if there is nothing to read anymore
+                if(total_b > 0) { //< If something was received (even if BIO_should_read returns false), we can count it as response
+                    return SUCCESS;
+                }
+
+                printerr(COMMUNICATION_ERROR, "Unable to get response from the '%s'!", url);
+                return COMMUNICATION_ERROR;
+            }
+            else {
+                if(nanosleep(&req, &rem) < 0) { //Needs gnu* standard
+                    printerr(INTERNAL_ERROR, "%s", strerror(errno));
+                    return INTERNAL_ERROR;
+                }
+            }
+
+            attempt_num++;
+        }
+
+        total_b += ret;
+        last_size = resp_b->size;
+
+        if(resp_b->size == total_b) { //< Response is in whole buffer => extend it and try to read again
+            if(!(resp_b = ext_string(resp_b))) {
+                printerr(INTERNAL_ERROR, "Error while expanding buffer for response!");
+                return INTERNAL_ERROR;
+            }
+        }
+    }
+
+    return SUCCESS;
+}
+
+
+int https_connect(h_url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
     int ret;
+
+    //Based on IBM tutorial https://developer.ibm.com/tutorials/l-openssl/
+    SSL_CTX *ctx = SSL_CTX_new(SSLv23_client_method());
+    SSL *ssl;
+
+    if(!s->certfile && !s->certaddr) {
+        ret = SSL_CTX_set_default_verify_paths(ctx);
+    }
+    else {
+        ret = SSL_CTX_load_verify_locations(ctx, s->certfile, s->certaddr); //< First is performed searching in file then in dir 
+    }
+   
+    if(ret == 0) { //< Setting of paths was not succesful
+        const char *appendix = s->certfile || s->certaddr ? "Please check given paths!" : "";
+        printerr(PATH_ERROR, "Unable to set paths to certificate files! %s", appendix);
+        SSL_CTX_free(ctx);
+        return PATH_ERROR;
+    }
+
+    BIO *bio = BIO_new_ssl_connect(ctx);
+    BIO_get_ssl(bio, &ssl);
+    if(!ssl) {
+        printerr(INTERNAL_ERROR, "Unable to allocate SSL ptr!");
+        SSL_CTX_free(ctx);
+        return INTERNAL_ERROR;
+    }
+
+    SSL_set_mode(ssl, SSL_MODE_AUTO_RETRY); //< Set ssl to auto retry to prevent errors caused by non-application data
+    //End of code based on https://developer.ibm.com/tutorials/l-openssl/
+
+    if(!SSL_set_tlsext_host_name(ssl, p_url->h_url_parts[HOST])) { //< Set Server Name Indication (if it is missing, self signed certificate error can occur)
+        printerr(INTERNAL_ERROR, "Unable to set SNI!");
+        return INTERNAL_ERROR;
+    }
+
+    BIO_set_conn_hostname(bio, p_url->h_url_parts[HOST]->str); //< Always returns 1 -> no need to check retval
+    BIO_set_conn_port(bio, p_url->h_url_parts[PORT_PART]->str); //< -||-
+
+    if(BIO_do_connect(bio) <= 0) { //< Perform handshake
+        printerr(CONNECTION_ERROR, "Cannot connect to the '%s'!", url);
+        BIO_free_all(bio);
+        SSL_CTX_free(ctx);
+        return CONNECTION_ERROR;
+    }
+
+    if((ret = SSL_get_verify_result(ssl)) != X509_V_OK)
+    {
+        printerr(VERIFICATION_ERROR, "Unable to verify certificate of '%s'! (%s)", url, X509_verify_cert_error_string(ret));
+        BIO_free_all(bio);
+        SSL_CTX_free(ctx);
+        return VERIFICATION_ERROR;
+    }
+    
+    if((ret = send_request(bio, p_url, url)) != SUCCESS) {
+        BIO_free_all(bio);
+        SSL_CTX_free(ctx);
+        return ret;
+    }
+
+    if((ret = rec_response(bio, resp_b, url)) != SUCCESS) {
+        BIO_free_all(bio);
+        SSL_CTX_free(ctx);
+        return ret;
+    }
+    
+    #ifdef DEBUG
+    fprintf(stderr, "Response:\n%s\n", resp_b->str);
+    #endif
+
+    BIO_free_all(bio);
+    SSL_CTX_free(ctx);
+
+    return SUCCESS;
+}
+
+
+int http_connect(h_url_t *parsed_url, string_t *resp_b, char *url) {
+    int ret;
+    BIO *bio = BIO_new(BIO_s_connect());
+    if(!bio) {
+        printerr(INTERNAL_ERROR, "Unable to allocate BIO!");
+        return INTERNAL_ERROR;
+    }
+
+    BIO_set_conn_hostname(bio, parsed_url->h_url_parts[HOST]->str); //< Always returns 1 -> no need to check retval
+    BIO_set_conn_port(bio, parsed_url->h_url_parts[PORT_PART]->str); //< -||-
+
+    if(BIO_do_connect(bio) <= 0) {
+        printerr(CONNECTION_ERROR, "Cannot connect to the '%s'!", url);
+        BIO_free_all(bio);
+        return CONNECTION_ERROR;
+    }
+    
+    if((ret = send_request(bio, parsed_url, url)) != SUCCESS) {
+        BIO_free_all(bio);
+        return ret;
+    }
+
+    if((ret = rec_response(bio, resp_b, url)) != SUCCESS) {
+        BIO_free_all(bio);
+        return ret;
+    }
+    
+    #ifdef DEBUG
+    fprintf(stderr, "Response:\n%s\n", resp_b->str);
+    #endif
+
+    BIO_free_all(bio);
+
+    return SUCCESS;
+}
+
+
+int read_and_print_feed(list_t *url_list, settings_t *settings) {
+    list_el_t *current = url_list->header;
+    int ret = SUCCESS;
 
     h_url_t parsed_url;
     init_h_url(&parsed_url);
+
+    string_t *resp_buff = new_string(INIT_NET_BUFF_SIZE);
+    if(!resp_buff) {
+        printerr(INTERNAL_ERROR, "Unable to allocate buffer for responses!");
+        return INTERNAL_ERROR;
+    }
 
     openssl_init();
     while(current) {
         char *url = current->string->str;
 
         if((ret = parse_h_url(url, &parsed_url, "https://")) != SUCCESS) {
+            string_dtor(resp_buff);
             h_url_dtor(&parsed_url);
             return ret;
         }
 
-        BIO *bio = BIO_new(BIO_s_connect());
-        if(!bio) {
-            printerr(INTERNAL_ERROR, "Unable to allocate BIO!");
-            h_url_dtor(&parsed_url);
-            return INTERNAL_ERROR;
+        if(!strcmp("https://", parsed_url.h_url_parts[SCHEME_PART]->str)) {
+            ret = https_connect(&parsed_url, resp_buff, url, settings);
+        }
+        else {
+            ret = http_connect(&parsed_url, resp_buff, url);
         }
 
-        BIO_set_conn_hostname(bio, parsed_url.h_url_parts[HOST]->str); //< Always returns 1 -> no need to check retval
-        BIO_set_conn_port(bio, parsed_url.h_url_parts[PORT_PART]->str); //< -||-
-
-        if(BIO_do_connect(bio) <= 0) {
-            printerr(CONNECTION_ERROR, "Cannot connect to the '%s'!", url);
-            #ifdef DEBUG
-                fprintf(stderr, "Details:\n");
-                ERR_print_errors_fp(stderr);
-            #endif
-            h_url_dtor(&parsed_url);
-            BIO_free_all(bio);
-            return CONNECTION_ERROR;
+        if(ret != SUCCESS) {
+            break;
         }
-        
-        send_request(bio, &parsed_url, url);
-
-        BIO_free_all(bio);
 
         current = current->next;
     }
 
+    string_dtor(resp_buff);
     h_url_dtor(&parsed_url);
-    return SUCCESS;
+
+    return ret;
 }
 
 
@@ -266,7 +421,7 @@ int main(int argc, char **argv) {
         list_append(&url_list, first);
     }
 
-    ret_code = get_feed(&url_list, &settings);
+    ret_code = read_and_print_feed(&url_list, &settings);
     if(ret_code != SUCCESS) {
         list_dtor(&url_list);
         return ret_code;

@@ -20,8 +20,8 @@
 
 #define PROGNAME "feedreader"
 
-#define INIT_STRING_SIZE 32
-#define INIT_NET_BUFF_SIZE 512
+#define INIT_STRING_SIZE 32 //< Default initial size of strings (that are used as buffer)
+#define INIT_NET_BUFF_SIZE 4096 //< Must be big enough for request (at least strlen(req_pattern) + strlen(host) + strlen(path) + strlen("\0"))
 
 #define DEBUG
 
@@ -30,8 +30,11 @@ enum err_codes {
     SUCCESS,
     USAGE_ERROR,
     FILE_ERROR,
-    INVALID_URL,
+    URL_ERROR,
     CONNECTION_ERROR,
+    COMMUNICATION_ERROR,
+    PATH_ERROR,
+    VERIFICATION_ERROR,
     INTERNAL_ERROR,
 };
 
@@ -74,7 +77,7 @@ typedef struct h_url {
 
 //Based on RFC3986
 #define HEXDIG "[0-9a-f]"
-#define H16 HEXDIG "{4}"
+#define H16 HEXDIG "{1,4}"
 #define LS32 "(" H16 ":" H16 ")|" IPV4ADDRESS
 
 #define UNRESERVED "[a-z0-9\\-\\._~]"
@@ -125,9 +128,11 @@ void erase_string(string_t *string);
 
 void trunc_string(string_t *string, int n);
 
-string_t *app_char(string_t *dest, char c);
+string_t *app_char(string_t **dest, char c);
 
-string_t *set_string(string_t *dest, char *src);
+string_t *set_string(string_t **dest, char *src);
+
+string_t *ext_string(string_t *string);
 
 void set_stringn(string_t *dest, char *src, size_t n);
 

@@ -18,10 +18,13 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+
 
 #include "utils.h"
 #include "cli.h"
 
-#define REQ_TIME_INTERVAL_NS 5e8
-#define MAX_ATTEMPT_NUM 5
+#define REQ_TIME_INTERVAL_NS 5e7
+#define MAX_ATTEMPT_NUM 10
 

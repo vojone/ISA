@@ -17,6 +17,9 @@ void printerr(int err_code, const char *message_format,...) {
         "Error while opening file",
         "Invalid URL",
         "Connection error",
+        "Communication error",
+        "Path error",
+        "Verification error",
         "Internal error",
     };
 
@@ -37,7 +40,7 @@ void printw(const char *message_format,...) {
 
     if(message_format) {
         va_list args;
-        va_start (args, message_format);
+        va_start(args, message_format);
         vfprintf(stderr, message_format, args);
     }
 
@@ -105,8 +108,8 @@ int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
     }
 
     if(res[HOST] == REG_NOMATCH || is_inv) { //< Host was not found in URL
-        printerr(INVALID_URL, "Bad format of URL '%s'!", url);
-        return INVALID_URL;
+        printerr(URL_ERROR, "Bad format of URL '%s'!", url);
+        return URL_ERROR;
     }
 
     if(res[SCHEME_PART] == REG_NOMATCH) { //< Non-strict parsing
@@ -219,6 +222,7 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
     free_all_patterns(regexes);
 
     #ifdef DEBUG //Prints the results of parsing
+        fprintf(stderr, "Parsed URL parts\n");
         //fprintf(stderr, "Strlen(url): %ld End of parsed part: %ld\n", strlen(url), glob_st);
         fprintf(stderr, "i\tres\tstart\tend\n");
         for(int i = 0; i < RE_H_URL_NUM; i++) {
@@ -263,7 +267,7 @@ list_el_t *new_element(char *string_content) {
         return NULL;
     }
 
-    if(!set_string(new->string, string_content)) {
+    if(!(new->string = set_string(&(new->string), string_content))) {
         free(new);
         return NULL;
     }
@@ -329,17 +333,16 @@ string_t *new_string(size_t size) {
 string_t *ext_string(string_t *string) {
     const int coef = 2;
 
-    char *tmp = string->str;
-    string->str = new_str(string->size*coef);
+    size_t old_size = string->size;
+
+    string->str = realloc(string->str, string->size*coef);
     if(!string->str) {
-        free(tmp);
         return NULL;
     }
 
-    set_string(string, tmp);
-    free(tmp);
-
     string->size *= coef;
+
+    memset(&(string->str[old_size]), 0, string->size - old_size);
 
     return string;
 } 
@@ -366,31 +369,31 @@ void trunc_string(string_t *string, int n) {
 }
 
 
-string_t *app_char(string_t *dest, char c) {
-    if(strlen(dest->str) >= dest->size - 1) {
-        if(!ext_string(dest)) {
+string_t *app_char(string_t **dest, char c) {
+    if(strlen((*dest)->str) >= (*dest)->size - 1) {
+        if(!(*dest = ext_string(*dest))) {
             return NULL;
         }    
     }
 
-    dest->str[strlen(dest->str)] = c;
+    (*dest)->str[strlen((*dest)->str)] = c;
 
-    return dest;
+    return *dest;
 }
 
 
-string_t *set_string(string_t *dest, char *src) {
-    memset(dest->str, 0, dest->size);
+string_t *set_string(string_t **dest, char *src) {
+    memset((*dest)->str, 0, (*dest)->size);
 
-    while(dest->size < strlen(src)) {
-        if(!ext_string(dest)) {
+    while((*dest)->size < strlen(src)) {
+        if(!(*dest = ext_string(*dest))) {
             return NULL;
         }
     }
 
-    strncpy(dest->str, src, dest->size);
+    strncpy((*dest)->str, src, (*dest)->size);
 
-    return dest;
+    return *dest;
 }
 
 
