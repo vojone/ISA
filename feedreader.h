@@ -21,6 +21,7 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 
+#include <sys/socket.h>
 
 #include "utils.h"
 #include "cli.h"

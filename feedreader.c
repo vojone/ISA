@@ -156,6 +156,11 @@ int send_request(BIO *bio, h_url_t *p_url, char *url) {
         p_url->h_url_parts[PATH]->str, 
         p_url->h_url_parts[HOST]->str);
 
+    #ifdef DEBUG
+        fprintf(stderr, "Request:\n");
+        fprintf(stderr, "%s\n", request_b);
+    #endif
+
     while((ret = BIO_write(bio, request_b, strlen(request_b))) <= 0) {
         if(!BIO_should_retry(bio) || attempt_num >= MAX_ATTEMPT_NUM) { //< Checking if write should be repeated (in some cases is should be repeated even without SSL due to docs)
             printerr(COMMUNICATION_ERROR, "Unable to send request to the '%s'!", url);
@@ -178,17 +183,18 @@ int send_request(BIO *bio, h_url_t *p_url, char *url) {
 int rec_response(BIO *bio, string_t *resp_b, char *url) {
     int ret = 0, attempt_num = 0;
 
-    const struct timespec req = { 
+    const struct timespec req = {
         .tv_nsec = REQ_TIME_INTERVAL_NS, 
         .tv_sec = 0
     };
     struct timespec rem;
 
-    size_t emp_size = 0, last_size = 0, total_b = 0;
-    while(last_size == total_b) { //< Extend buffer until whole response don't fit in
-        emp_size = resp_b->size - last_size;
+    char test_char;
+    size_t emp_size = 0, total_b = 0;
+    while(recv(BIO_get_fd(bio, NULL), &test_char, 1, MSG_PEEK) == 1) { //< Extend buffer until there is something on the input (there can be delay in case of SSL -> check it on the level of sockets)
+        emp_size = resp_b->size - total_b;
         while((ret = BIO_read(bio, &(resp_b->str[total_b]), emp_size)) <= 0) {
-            if(!BIO_should_read(bio) || attempt_num >= MAX_ATTEMPT_NUM) { //< Checking if read should be repeated, but is BIO_should_read returns false if there is nothing to read anymore
+            if((!BIO_should_read(bio) || attempt_num >= MAX_ATTEMPT_NUM)) { //< Checking if read should be repeated, but is BIO_should_read returns false if there is nothing to read anymore
                 if(total_b > 0) { //< If something was received (even if BIO_should_read returns false), we can count it as response
                     return SUCCESS;
                 }
@@ -207,8 +213,6 @@ int rec_response(BIO *bio, string_t *resp_b, char *url) {
         }
 
         total_b += ret;
-        last_size = resp_b->size;
-
         if(resp_b->size == total_b) { //< Response is in whole buffer => extend it and try to read again
             if(!(resp_b = ext_string(resp_b))) {
                 printerr(INTERNAL_ERROR, "Error while expanding buffer for response!");
@@ -221,8 +225,14 @@ int rec_response(BIO *bio, string_t *resp_b, char *url) {
 }
 
 
+void free_https_connection(BIO *bio, SSL_CTX *ctx) {
+    BIO_free_all(bio);
+    SSL_CTX_free(ctx);
+}
+
+
 int https_connect(h_url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
-    int ret;
+    int ret = SUCCESS;
 
     //Based on IBM tutorial https://developer.ibm.com/tutorials/l-openssl/
     SSL_CTX *ctx = SSL_CTX_new(SSLv23_client_method());
@@ -263,38 +273,33 @@ int https_connect(h_url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
 
     if(BIO_do_connect(bio) <= 0) { //< Perform handshake
         printerr(CONNECTION_ERROR, "Cannot connect to the '%s'!", url);
-        BIO_free_all(bio);
-        SSL_CTX_free(ctx);
+        free_https_connection(bio, ctx);
         return CONNECTION_ERROR;
     }
 
-    if((ret = SSL_get_verify_result(ssl)) != X509_V_OK)
-    {
+    if(SSL_get_verify_result(ssl) != X509_V_OK) { //< Check verify result
         printerr(VERIFICATION_ERROR, "Unable to verify certificate of '%s'! (%s)", url, X509_verify_cert_error_string(ret));
-        BIO_free_all(bio);
-        SSL_CTX_free(ctx);
+        free_https_connection(bio, ctx);
         return VERIFICATION_ERROR;
     }
+
+    //TODO get peer certificate
     
-    if((ret = send_request(bio, p_url, url)) != SUCCESS) {
-        BIO_free_all(bio);
-        SSL_CTX_free(ctx);
+    if((ret = send_request(bio, p_url, url)) != SUCCESS) { //< Send request to the server
+        free_https_connection(bio, ctx);
         return ret;
     }
 
-    if((ret = rec_response(bio, resp_b, url)) != SUCCESS) {
-        BIO_free_all(bio);
-        SSL_CTX_free(ctx);
+    if((ret = rec_response(bio, resp_b, url)) != SUCCESS) { //< Receive response
+        free_https_connection(bio, ctx);
         return ret;
     }
     
     #ifdef DEBUG
-    fprintf(stderr, "Response:\n%s\n", resp_b->str);
+        fprintf(stdout, "Response (%ld):\n%s\n", strlen(resp_b->str), resp_b->str);
     #endif
 
-    BIO_free_all(bio);
-    SSL_CTX_free(ctx);
-
+    free_https_connection(bio, ctx);
     return SUCCESS;
 }
 
@@ -325,9 +330,9 @@ int http_connect(h_url_t *parsed_url, string_t *resp_b, char *url) {
         BIO_free_all(bio);
         return ret;
     }
-    
+
     #ifdef DEBUG
-    fprintf(stderr, "Response:\n%s\n", resp_b->str);
+        fprintf(stderr, "Response (%ld):\n%s\n", strlen(resp_b->str), resp_b->str);
     #endif
 
     BIO_free_all(bio);
