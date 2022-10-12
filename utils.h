@@ -15,6 +15,7 @@
 #include <stdarg.h>
 #include <regex.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <sys/types.h>
 
 
@@ -35,6 +36,7 @@ enum err_codes {
     COMMUNICATION_ERROR,
     PATH_ERROR,
     VERIFICATION_ERROR,
+    HTTP_ERROR,
     INTERNAL_ERROR,
 };
 
@@ -43,6 +45,12 @@ typedef struct string {
     char *str;
     size_t size;
 } string_t;
+
+
+typedef struct string_slice {
+    char *st;
+    size_t len;
+} string_slice_t;
 
 
 typedef struct list_el {
@@ -73,6 +81,26 @@ typedef struct h_url {
 } h_url_t;
 
 
+enum re_h_resp_indexes {
+    H_PART,
+    LINE,
+    VER,
+    STAT,
+    PHR,
+    LOC,
+    RE_H_RESP_NUM, //< Maximum amount of tokens in URL 
+};
+
+
+typedef struct h_resp {
+    string_slice_t version;
+    string_slice_t status;
+    string_slice_t phrase;
+    string_slice_t location;
+    char *msg;
+}   h_resp_t;
+
+
 //http-URI = "http" "://" authority path-abempty [ "?" query ] ("#" [fragment]) (see RFC9110)
 
 //Based on RFC3986
@@ -80,7 +108,7 @@ typedef struct h_url {
 #define H16 HEXDIG "{1,4}"
 #define LS32 "(" H16 ":" H16 ")|" IPV4ADDRESS
 
-#define UNRESERVED "[a-z0-9\\-\\._~]"
+#define UNRESERVED "[a-z0-9\\._~\\-]"
 #define SUBDELIMS "[@!\\$&'()*+,;=]"
 #define PCTENCODED "%" HEXDIG HEXDIG
 #define DECOCTED "[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-5]{2}"
@@ -114,7 +142,11 @@ void init_h_url(h_url_t *h_url);
 
 void h_url_dtor(h_url_t *h_url);
 
+void init_h_resp(h_resp_t *h_resp);
+
 int parse_h_url(char *url, h_url_t *parsed_url, char* default_scheme_str);
+
+int parse_http_resp(string_t *response, h_resp_t *parsed_resp, char *url);
 
 list_el_t *new_element(char *string_content);
 

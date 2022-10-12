@@ -140,11 +140,9 @@ void openssl_init() {
 int send_request(BIO *bio, h_url_t *p_url, char *url) {
     int ret, attempt_num = 0;
 
-    const struct timespec req = { 
-        .tv_nsec = REQ_TIME_INTERVAL_NS, 
-        .tv_sec = 0
-    };
-    struct timespec rem;
+    struct pollfd pfd;
+    pfd.fd = BIO_get_fd(bio, NULL);
+    pfd.events = POLLIN;
 
     char request_b[INIT_NET_BUFF_SIZE];
     snprintf(request_b, INIT_NET_BUFF_SIZE, 
@@ -162,14 +160,15 @@ int send_request(BIO *bio, h_url_t *p_url, char *url) {
     #endif
 
     while((ret = BIO_write(bio, request_b, strlen(request_b))) <= 0) {
-        if(!BIO_should_retry(bio) || attempt_num >= MAX_ATTEMPT_NUM) { //< Checking if write should be repeated (in some cases is should be repeated even without SSL due to docs)
+        if(!BIO_should_retry(bio)) { //< Checking if write should be repeated (in some cases is should be repeated even without SSL due to docs)
             printerr(COMMUNICATION_ERROR, "Unable to send request to the '%s'!", url);
             return COMMUNICATION_ERROR;
         }
         else {
-            if(nanosleep(&req, &rem) < 0) { //Needs gnu* standard
-                printerr(INTERNAL_ERROR, "%s", strerror(errno));
-                return INTERNAL_ERROR;
+            ret = poll(&pfd, 1, TIMEOUT_S); //TODO
+            if(ret && !(pfd.revents && POLLIN)) {
+                printerr(COMMUNICATION_ERROR, "Unable to send request to the '%s'!", url);
+                return COMMUNICATION_ERROR;
             }
         }
 
@@ -181,21 +180,20 @@ int send_request(BIO *bio, h_url_t *p_url, char *url) {
 
 
 int rec_response(BIO *bio, string_t *resp_b, char *url) {
-    int ret = 0, attempt_num = 0;
-
-    const struct timespec req = {
-        .tv_nsec = REQ_TIME_INTERVAL_NS, 
-        .tv_sec = 0
-    };
-    struct timespec rem;
+    int ret = 0;
 
     char test_char;
     size_t emp_size = 0, total_b = 0;
+
+    struct pollfd pfd;
+    pfd.fd = BIO_get_fd(bio, NULL);
+    pfd.events = POLLIN;
+
     while(recv(BIO_get_fd(bio, NULL), &test_char, 1, MSG_PEEK) == 1) { //< Extend buffer until there is something on the input (there can be delay in case of SSL -> check it on the level of sockets)
         emp_size = resp_b->size - total_b;
         while((ret = BIO_read(bio, &(resp_b->str[total_b]), emp_size)) <= 0) {
-            if((!BIO_should_read(bio) || attempt_num >= MAX_ATTEMPT_NUM)) { //< Checking if read should be repeated, but is BIO_should_read returns false if there is nothing to read anymore
-                if(total_b > 0) { //< If something was received (even if BIO_should_read returns false), we can count it as response
+            if(!BIO_should_read(bio)) { //< Checking if read should be repeated, but is BIO_should_read returns false if there is nothing to read anymore
+                if(total_b > 0) {
                     return SUCCESS;
                 }
 
@@ -203,13 +201,12 @@ int rec_response(BIO *bio, string_t *resp_b, char *url) {
                 return COMMUNICATION_ERROR;
             }
             else {
-                if(nanosleep(&req, &rem) < 0) { //Needs gnu* standard
-                    printerr(INTERNAL_ERROR, "%s", strerror(errno));
-                    return INTERNAL_ERROR;
+                ret = poll(&pfd, 1, TIMEOUT_S); //TODO
+                if(ret && !(pfd.revents && POLLIN)) {
+                    printerr(COMMUNICATION_ERROR, "Unable to get response from the '%s'!", url);
+                    return COMMUNICATION_ERROR;
                 }
             }
-
-            attempt_num++;
         }
 
         total_b += ret;
@@ -296,7 +293,7 @@ int https_connect(h_url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
     }
     
     #ifdef DEBUG
-        fprintf(stdout, "Response (%ld):\n%s\n", strlen(resp_b->str), resp_b->str);
+        fprintf(stderr, "Response (%ld):\n%s\n", strlen(resp_b->str), resp_b->str);
     #endif
 
     free_https_connection(bio, ctx);
@@ -341,12 +338,52 @@ int http_connect(h_url_t *parsed_url, string_t *resp_b, char *url) {
 }
 
 
+int check_http_status(int status_c, string_t *phrase, char *url) {
+    switch(status_c/100) {
+        case 2:
+            return SUCCESS;
+        default:
+            printerr(HTTP_ERROR, "Got %s (code %d) from '%s'! expected OK (200)", phrase->str, status_c, url);
+            return HTTP_ERROR;
+    }
+}
+
+
+int check_http_resp(h_resp_t *parsed_resp, char *url) {
+    string_t *status = new_string(parsed_resp->status.len + 1);
+    if(!status) {
+        printerr(INTERNAL_ERROR, "Unable to allocate buffer for HTTP status code!");
+        return INTERNAL_ERROR;
+    }
+    set_stringn(status, parsed_resp->status.st, parsed_resp->status.len);
+
+    string_t *phrase = new_string(parsed_resp->phrase.len + 1);
+    if(!status) {
+        printerr(INTERNAL_ERROR, "Unable to allocate buffer for HTTP phrase!");
+        return INTERNAL_ERROR;
+    }
+    set_stringn(phrase, parsed_resp->phrase.st, parsed_resp->phrase.len);
+
+    char *rest = NULL;
+    int status_c = strtoul(status->str, &rest, 10);
+    int ret = check_http_status(status_c, phrase, url);
+
+    string_dtor(phrase);
+    string_dtor(status);
+
+    return ret;
+}
+
+
 int read_and_print_feed(list_t *url_list, settings_t *settings) {
     list_el_t *current = url_list->header;
     int ret = SUCCESS;
 
     h_url_t parsed_url;
     init_h_url(&parsed_url);
+
+    h_resp_t parsed_resp;
+    init_h_resp(&parsed_resp);
 
     string_t *resp_buff = new_string(INIT_NET_BUFF_SIZE);
     if(!resp_buff) {
@@ -370,10 +407,28 @@ int read_and_print_feed(list_t *url_list, settings_t *settings) {
         else {
             ret = http_connect(&parsed_url, resp_buff, url);
         }
-
         if(ret != SUCCESS) {
             break;
         }
+
+        ret = parse_http_resp(resp_buff, &parsed_resp, url);
+        if(ret != SUCCESS) {
+            break;
+        }
+
+        //ret = check_http_resp(&parsed_resp, url);
+        if(ret != SUCCESS) {
+            break;
+        }
+
+        #ifdef DEBUG
+            fprintf(stderr, "V: %ld %ld\n", parsed_resp.version.st - resp_buff->str, parsed_resp.version.len);
+            fprintf(stderr, "Status: %ld %ld\n", parsed_resp.status.st - resp_buff->str, parsed_resp.status.len);
+            fprintf(stderr, "Phrase: %ld %ld\n", parsed_resp.phrase.st - resp_buff->str, parsed_resp.phrase.len);
+            fprintf(stderr, "Loc: %ld %ld\n", parsed_resp.location.st - resp_buff->str, parsed_resp.location.len);
+            fprintf(stderr, "Msg: %s\n", parsed_resp.msg);
+        #endif
+
 
         current = current->next;
     }

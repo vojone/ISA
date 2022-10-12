@@ -23,9 +23,11 @@
 
 #include <sys/socket.h>
 
+#include <poll.h>
+
+
 #include "utils.h"
 #include "cli.h"
 
-#define REQ_TIME_INTERVAL_NS 5e7
-#define MAX_ATTEMPT_NUM 10
+#define TIMEOUT_S 5
 

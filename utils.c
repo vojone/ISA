@@ -20,10 +20,11 @@ void printerr(int err_code, const char *message_format,...) {
         "Communication error",
         "Path error",
         "Verification error",
+        "HTTP error",
         "Internal error",
     };
 
-    fprintf(stderr, "./%s: %s: ", PROGNAME, err_str[err_code]);
+    fprintf(stderr, "%s: %s: ", PROGNAME, err_str[err_code]);
 
     if(message_format) {
         va_list args;
@@ -63,8 +64,12 @@ void h_url_dtor(h_url_t *h_url) {
     }
 }
 
+void init_h_resp(h_resp_t *h_resp) {
+    memset(h_resp, 0, sizeof(h_resp_t));
+}
 
-int prepare_patterns(regex_t *regexes) {
+
+int prepare_url_patterns(regex_t *regexes) {
     //Patterns are based on RFC3986
     char *patterns[] = {
         "^(http|https)://",
@@ -72,14 +77,14 @@ int prepare_patterns(regex_t *regexes) {
         "(" IPV4ADDRESS ")|(\\[" IPV6ADDRESS "\\])|(" REGNAME ")",
         ":[0-9]*",
         "(/(" UNRESERVED "|" SUBDELIMS "|[:@]|(" PCTENCODED "))*)+",
-        "\\?([" UNRESERVED "|" SUBDELIMS "|[:@/?]|(" PCTENCODED "))*",
+        "\\?(" UNRESERVED "|" SUBDELIMS "|[:@/?]|(" PCTENCODED "))*",
         "#(" UNRESERVED "|" SUBDELIMS "|[:@/?]|(" PCTENCODED "))*"
     };
     //End of part base on RFC3986
 
     for(int i = 0; i < RE_H_URL_NUM; i++) {
         if(regcomp(&(regexes[i]), patterns[i], REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
-            printerr(INTERNAL_ERROR, "Invalid compilation of regexes! %d", i);
+            printerr(INTERNAL_ERROR, "Invalid compilation of URL regexes! %d", i);
             return INTERNAL_ERROR;
         }
     }
@@ -88,8 +93,8 @@ int prepare_patterns(regex_t *regexes) {
 }
 
 
-void free_all_patterns(regex_t *regexes) {
-    for(int i = 0; i < RE_H_URL_NUM; i++) {
+void free_all_patterns(regex_t *regexes, int r_num) {
+    for(int i = 0; i < r_num; i++) {
         regfree(&(regexes[i]));
     }
 }
@@ -175,8 +180,8 @@ int normalize_url(h_url_t *p_url, char* def_scheme_part_str) {
 }
 
 
-void init_res_arr(int *res) {
-    for(int i = 0; i < RE_H_URL_NUM; i++) {
+void init_res_arr(int *res, int res_num) {
+    for(int i = 0; i < res_num; i++) {
         res[i] = REG_NOMATCH;
     }
 }
@@ -187,11 +192,11 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
     regmatch_t regmatch[RE_H_URL_NUM];
     int res[RE_H_URL_NUM], ret;
 
-    if((ret = prepare_patterns(regexes)) != SUCCESS) { //< Preparation of POSIX regex structures
+    if((ret = prepare_url_patterns(regexes)) != SUCCESS) { //< Preparation of POSIX regex structures
         return ret;
     }
 
-    init_res_arr(res);
+    init_res_arr(res, RE_H_URL_NUM);
     size_t glob_st = 0; //< Index from which the searching begins
     bool is_invalid = false, int_err_occ = false;
     for(int i = 0; i < RE_H_URL_NUM && !is_invalid && !int_err_occ; i++) {
@@ -219,7 +224,7 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
         is_invalid = true;
     }
 
-    free_all_patterns(regexes);
+    free_all_patterns(regexes, RE_H_URL_NUM);
 
     #ifdef DEBUG //Prints the results of parsing
         fprintf(stderr, "Parsed URL parts\n");
@@ -241,6 +246,151 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
     }
 
     return SUCCESS;
+}
+
+
+int prepare_resp_patterns(regex_t *regexes) {
+    char *patterns[] = { //< There is always ^ because we always match pattern from start of the string 
+        "^(.|\r\n)*\r\n\r\n",
+        "^.*\r\n",
+        "^[^ \t]*",
+        "^[0-9]{3}",
+        "^[^\r\n]*",
+        "^Location:",
+    };
+
+    for(int i = 0; i < RE_H_RESP_NUM; i++) {
+        if(regcomp(&(regexes[i]), patterns[i], REG_EXTENDED | REG_NEWLINE)) { //< We will need extended posix notation and case insensitive matching 
+            printerr(INTERNAL_ERROR, "Invalid compilation of response regexes! %d", i);
+            return INTERNAL_ERROR;
+        }
+    }
+
+    return SUCCESS;
+}
+
+
+char *skip_w_spaces(char *str) {
+    while(isspace(str[0])) {
+        str = &(str[1]);
+    }
+
+    return str;
+}
+
+
+string_slice_t new_str_slice(char *ptr, size_t len) {
+    string_slice_t slice = {
+        .st = ptr,
+        .len = len,
+    };
+
+    return slice;
+}
+
+
+int parse_first_line(char *cursor, regex_t *r, char *url, h_resp_t *p_resp) {
+    int res[RE_H_RESP_NUM];
+    regmatch_t regmatch[RE_H_RESP_NUM];
+    init_res_arr(res, RE_H_RESP_NUM);
+
+    res[VER] = regexec(&(r[VER]), cursor, 1, &(regmatch[VER]), 0);
+    if(res[VER] != REG_NOMATCH) {
+        p_resp->version = new_str_slice(cursor, regmatch[VER].rm_eo - regmatch[VER].rm_so);
+        cursor = &(cursor[regmatch[VER].rm_eo]);
+    }
+
+    cursor = skip_w_spaces(cursor);
+    res[STAT] = regexec(&(r[STAT]), cursor, 1, &(regmatch[STAT]), 0);
+    if(res[STAT] == REG_NOMATCH) {
+        printerr(HTTP_ERROR, "Unable to find status code in reponse from '%s'!", cursor);
+        return HTTP_ERROR;
+    }
+
+    p_resp->status = new_str_slice(cursor, regmatch[STAT].rm_eo - regmatch[STAT].rm_so);
+    cursor = &(cursor[regmatch[STAT].rm_eo]);
+
+    cursor = skip_w_spaces(cursor);
+    res[PHR] = regexec(&(r[PHR]), cursor, 1, &(regmatch[PHR]), 0);
+    if(res[PHR] == REG_NOMATCH) {
+        printerr(HTTP_ERROR, "Unable to find status phrase in reponse from '%s'!", url);
+        return HTTP_ERROR;
+    }
+
+    p_resp->phrase = new_str_slice(cursor, regmatch[PHR].rm_eo - regmatch[PHR].rm_so);
+    cursor = &(cursor[regmatch[PHR].rm_eo]);
+
+    return SUCCESS;
+}
+
+
+int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
+    size_t line_no = 0;
+
+    int res[RE_H_RESP_NUM], ret = SUCCESS;
+    regmatch_t regm[RE_H_RESP_NUM];
+    init_res_arr(res, RE_H_RESP_NUM);
+
+    char *cursor = h_st, *line_st;
+    res[LINE] = regexec(&(r[LINE]), cursor, 1, &(regm[LINE]), 0);
+
+    for(; line_no == 0 || res[LINE] != REG_NOMATCH; line_no++) {
+        cursor = line_st = &(cursor[regm[LINE].rm_so]);
+
+        if(line_no == 0) {
+            if((ret = parse_first_line(cursor, r, url, p_resp)) != SUCCESS) {
+                break;
+            }
+        }
+        else {
+            res[LOC] = regexec(&(r[LOC]), cursor, 1, &(regm[LOC]), 0);
+
+            if(res[LOC] != REG_NOMATCH) {
+                cursor = skip_w_spaces(cursor);
+                size_t len = (size_t)(&cursor[regm[LINE].rm_eo] - cursor);
+                p_resp->location = new_str_slice(cursor, len - strlen("\r\n"));
+            }   
+        }
+
+        cursor = &(line_st[regm[LINE].rm_eo]);
+        res[LINE] = regexec(&(r[LINE]), cursor, 1, &(regm[LINE]), 0);
+    }
+
+    if(line_no == 0 && ret == SUCCESS) {
+        printerr(HTTP_ERROR, "Invalid headers of HTTP response from '%s' (missing initial header)!", url);
+        ret = HTTP_ERROR;
+    }
+
+    return ret;
+}
+
+
+int parse_http_resp(string_t *response, h_resp_t *parsed_resp, char *url) {
+    regex_t regexes[RE_H_RESP_NUM];
+    regmatch_t regmatch[RE_H_RESP_NUM];
+    int res[RE_H_RESP_NUM], ret = SUCCESS;
+    char *resp = response->str;
+
+    if((ret = prepare_resp_patterns(regexes)) != SUCCESS) { //< Preparation of POSIX regex structures
+        return ret;
+    }
+
+    init_res_arr(res, RE_H_RESP_NUM);
+
+    res[H_PART] = regexec(&regexes[H_PART], resp, 1, &(regmatch[H_PART]), 0);
+
+    if(res[H_PART] == REG_NOMATCH) {
+        printerr(HTTP_ERROR, "Headers of HTTP response from '%s' was not found!", url);
+        ret = HTTP_ERROR;
+    }
+    else {
+        parsed_resp->msg = &(resp[regmatch[H_PART].rm_eo]);
+        ret = parse_resp_headers(resp, regexes, url, parsed_resp);
+    }
+
+    free_all_patterns(regexes, RE_H_RESP_NUM);
+
+    return ret;
 }
 
 
