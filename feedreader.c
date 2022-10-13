@@ -33,10 +33,9 @@ int validate_settings(settings_t *settings) {
 
 
 int move_to_list(string_t *buffer, list_t *dst_list) {
-    list_el_t *new_url = new_element(buffer->str);
+    list_el_t *new_url = new_element(buffer->str, 0);
     if(!new_url) {
-        string_dtor(buffer);
-        printerr(INTERNAL_ERROR, "");
+        printerr(INTERNAL_ERROR, "Unable to move '%s' to the list!", buffer->str);
         return INTERNAL_ERROR;
     }
 
@@ -120,7 +119,6 @@ int parse_feedfile(char *path, list_t *url_list) {
         current = current->next;
     }
     #endif
-    
 
     string_dtor(buffer);
     fclose(file_ptr);
@@ -260,8 +258,9 @@ int https_connect(h_url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
     SSL_set_mode(ssl, SSL_MODE_AUTO_RETRY); //< Set ssl to auto retry to prevent errors caused by non-application data
     //End of code based on https://developer.ibm.com/tutorials/l-openssl/
 
-    if(!SSL_set_tlsext_host_name(ssl, p_url->h_url_parts[HOST])) { //< Set Server Name Indication (if it is missing, self signed certificate error can occur)
+    if(!SSL_set_tlsext_host_name(ssl, p_url->h_url_parts[HOST]->str)) { //< Set Server Name Indication (if it is missing, self signed certificate error can occur)
         printerr(INTERNAL_ERROR, "Unable to set SNI!");
+        free_https_connection(bio, ctx);
         return INTERNAL_ERROR;
     }
 
@@ -342,6 +341,9 @@ int check_http_status(int status_c, string_t *phrase, char *url) {
     switch(status_c/100) {
         case 2:
             return SUCCESS;
+        case 3:
+            printw("Got %s (code %d) from '%s'! Redirecting to...", phrase->str, status_c, url);
+            return HTTP_REDIRECT;
         default:
             printerr(HTTP_ERROR, "Got %s (code %d) from '%s'! expected OK (200)", phrase->str, status_c, url);
             return HTTP_ERROR;
@@ -349,20 +351,43 @@ int check_http_status(int status_c, string_t *phrase, char *url) {
 }
 
 
-int check_http_resp(h_resp_t *parsed_resp, char *url) {
-    string_t *status = new_string(parsed_resp->status.len + 1);
+int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
+    if(cur_url->indirect_lvl >= MAX_REDIR_NUM) {
+        printerr(HTTP_ERROR, "Maximum number of redirections (%d) was exceeded!", MAX_REDIR_NUM);
+        return HTTP_ERROR;
+    }
+    else if(p_resp->location.st != NULL) {
+        size_t new_lvl = cur_url->indirect_lvl + 1;
+        list_el_t *new_url = slice2element(&(p_resp->location), new_lvl);
+        if(!new_url) {
+            printerr(INTERNAL_ERROR, "Unable to allocate memory for new URL!");
+            return INTERNAL_ERROR;
+        }
+
+        new_url->next = cur_url->next;
+        cur_url->next = new_url;
+    }
+    else {
+        printerr(HTTP_ERROR, "Unable to redirect, because Location header was not found!");
+        return HTTP_ERROR;
+    }
+
+    return SUCCESS;
+}
+
+
+int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
+    string_t *status = slice_to_string(&(p_resp->status));
     if(!status) {
         printerr(INTERNAL_ERROR, "Unable to allocate buffer for HTTP status code!");
         return INTERNAL_ERROR;
     }
-    set_stringn(status, parsed_resp->status.st, parsed_resp->status.len);
 
-    string_t *phrase = new_string(parsed_resp->phrase.len + 1);
+    string_t *phrase = slice_to_string(&(p_resp->phrase));
     if(!status) {
         printerr(INTERNAL_ERROR, "Unable to allocate buffer for HTTP phrase!");
         return INTERNAL_ERROR;
     }
-    set_stringn(phrase, parsed_resp->phrase.st, parsed_resp->phrase.len);
 
     char *rest = NULL;
     int status_c = strtoul(status->str, &rest, 10);
@@ -370,6 +395,10 @@ int check_http_resp(h_resp_t *parsed_resp, char *url) {
 
     string_dtor(phrase);
     string_dtor(status);
+
+    if(ret == HTTP_REDIRECT) {
+        ret = http_redirect(p_resp, cur_url);
+    }
 
     return ret;
 }
@@ -395,6 +424,7 @@ int read_and_print_feed(list_t *url_list, settings_t *settings) {
     while(current) {
         char *url = current->string->str;
 
+        erase_h_url(&parsed_url);
         if((ret = parse_h_url(url, &parsed_url, "https://")) != SUCCESS) {
             string_dtor(resp_buff);
             h_url_dtor(&parsed_url);
@@ -411,12 +441,12 @@ int read_and_print_feed(list_t *url_list, settings_t *settings) {
             break;
         }
 
-        ret = parse_http_resp(resp_buff, &parsed_resp, url);
+        ret = parse_http_resp(&parsed_resp, resp_buff, url);
         if(ret != SUCCESS) {
             break;
         }
 
-        //ret = check_http_resp(&parsed_resp, url);
+        ret = check_http_resp(&parsed_resp, current, url);
         if(ret != SUCCESS) {
             break;
         }
@@ -471,7 +501,7 @@ int main(int argc, char **argv) {
         }
     }
     else if(settings.url) {
-        list_el_t *first = new_element(settings.url);
+        list_el_t *first = new_element(settings.url, 0);
         if(!first) {
             printerr(INTERNAL_ERROR, "Unable to allocate new element for url list!");
             list_dtor(&url_list);

@@ -41,6 +41,11 @@ enum err_codes {
 };
 
 
+#define HTTP_REDIRECT -1
+
+#define MAX_REDIR_NUM 0
+
+
 typedef struct string {
     char *str;
     size_t size;
@@ -55,6 +60,7 @@ typedef struct string_slice {
 
 typedef struct list_el {
     string_t *string;
+    int indirect_lvl;
     struct list_el *next;
 } list_el_t;
 
@@ -142,13 +148,17 @@ void init_h_url(h_url_t *h_url);
 
 void h_url_dtor(h_url_t *h_url);
 
+void erase_h_url(h_url_t *h_url);
+
 void init_h_resp(h_resp_t *h_resp);
 
 int parse_h_url(char *url, h_url_t *parsed_url, char* default_scheme_str);
 
-int parse_http_resp(string_t *response, h_resp_t *parsed_resp, char *url);
+int parse_http_resp(h_resp_t *parsed_resp, string_t *response, char *url);
 
-list_el_t *new_element(char *string_content);
+list_el_t *new_element(char *str_content, size_t indir_level);
+
+list_el_t *slice2element(string_slice_t *slice, size_t indir_level);
 
 void list_init(list_t *list);
 
@@ -158,6 +168,8 @@ void list_append(list_t *list, list_el_t *new_element);
 
 void erase_string(string_t *string);
 
+bool is_empty(string_t *string);
+
 void trunc_string(string_t *string, int n);
 
 string_t *app_char(string_t **dest, char c);
@@ -166,7 +178,7 @@ string_t *set_string(string_t **dest, char *src);
 
 string_t *ext_string(string_t *string);
 
-void set_stringn(string_t *dest, char *src, size_t n);
+string_t *set_stringn(string_t **dest, char *src, size_t n);
 
 /**
  * @brief 
@@ -175,6 +187,8 @@ void set_stringn(string_t *dest, char *src, size_t n);
  * @return string_t* 
  */
 string_t *new_string(size_t size);
+
+string_t *slice_to_string(string_slice_t *slice);
 
 void string_dtor(string_t *string);
 

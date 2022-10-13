@@ -37,7 +37,7 @@ void printerr(int err_code, const char *message_format,...) {
 
 
 void printw(const char *message_format,...) {
-    fprintf(stderr, "./%s: Warning: ", PROGNAME);
+    fprintf(stderr, "%s: Warning: ", PROGNAME);
 
     if(message_format) {
         va_list args;
@@ -46,6 +46,13 @@ void printw(const char *message_format,...) {
     }
 
     fprintf(stderr, "\n");
+}
+
+
+void erase_h_url(h_url_t *h_url) {
+    for(int i = 0; i < RE_H_URL_NUM; i++) {
+        erase_string(h_url->h_url_parts[i]);
+    }
 }
 
 
@@ -128,44 +135,43 @@ int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
     return SUCCESS;
 }
 
+
 int normalize_url(h_url_t *p_url, char* def_scheme_part_str) {
-    string_t **url_parts = p_url->h_url_parts;
+    string_t **url_parts = p_url->h_url_parts, **dst;
 
-    if(!p_url->h_url_parts[SCHEME_PART]) { //< If scheme is missing, it does not necessary mean error, it is just set to default scheme 
-        size_t len = strlen(def_scheme_part_str);
+    if(is_empty(url_parts[SCHEME_PART])) { //< If scheme is missing, it does not necessary mean error, it is just set to default scheme 
+        dst = &(p_url->h_url_parts[SCHEME_PART]);
 
-        p_url->h_url_parts[SCHEME_PART] = new_string(len + 1);
+        url_parts[SCHEME_PART] = set_string(dst, def_scheme_part_str);
         if(!p_url->h_url_parts[SCHEME_PART]) {
+            printerr(INTERNAL_ERROR, "Unable to allocate buffer for scheme part of URL!");
             return INTERNAL_ERROR;
         }
-
-        set_stringn(url_parts[SCHEME_PART], def_scheme_part_str, len);
     }
 
-    if(!url_parts[PORT_PART]) { //< If port number was not set, set it by scheme sign (then must be determined default port number for given service)
-        size_t len = strlen(url_parts[SCHEME_PART]->str);
+    if(is_empty(url_parts[PORT_PART])) { //< If port number was not set, set it by scheme sign (then must be determined default port number for given service)
+        dst = &(url_parts[PORT_PART]);
 
-        url_parts[PORT_PART] = new_string(len + 1);
+        url_parts[PORT_PART] = set_string(dst, url_parts[SCHEME_PART]->str);
         if(!url_parts[PORT_PART]) {
+            printerr(INTERNAL_ERROR, "Unable to allocate buffer for port part of URL!");
             return INTERNAL_ERROR;
         }
 
-        set_stringn(url_parts[PORT_PART], url_parts[SCHEME_PART]->str, len);
         trunc_string(url_parts[PORT_PART], -((int)strlen("://"))); //< Remove :// from end
     }
     else {
         trunc_string(url_parts[PORT_PART], ((int)strlen(":"))); //< Remove : from start
     }
 
-    if(!url_parts[PATH]) { //< If path is not set (which is quite often situation), it is set to default path "/"
-        size_t len = strlen("/");
+    if(is_empty(url_parts[PATH])) { //< If path is not set (which is quite often situation), it is set to default path "/"
+        dst = &(url_parts[PATH]);
 
-        url_parts[PATH] = new_string(len + 1);
+        url_parts[PATH] = set_string(dst, "/");
         if(!url_parts[PATH]) {
+            printerr(INTERNAL_ERROR, "Unabel to allocate buffer for path of URL!");
             return INTERNAL_ERROR;
         }
-
-        set_stringn(url_parts[PATH], "/", len);
     }
 
     #ifdef DEBUG //Prints all parts of normalized url
@@ -177,6 +183,11 @@ int normalize_url(h_url_t *p_url, char* def_scheme_part_str) {
     #endif
  
     return SUCCESS;
+}
+
+
+bool is_empty(string_t *string) {
+    return (!string) || string->str == NULL || string->str[0] == '\0';
 }
 
 
@@ -210,13 +221,14 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
                 break;
             }
 
-            int len = end - st;
-            if(!(p_url->h_url_parts[i] = new_string(len + 1))) {
+            string_t **dst = &(p_url->h_url_parts[i]);
+            size_t len = end - st;
+            char *st_ptr = &(url[glob_st + st]);
+            if(!(p_url->h_url_parts[i] = set_stringn(dst, st_ptr, len))) { //< Save matched part of the string
                 int_err_occ = true;
                 break;
             }
 
-            set_stringn(p_url->h_url_parts[i], &(url[glob_st + st]), len); //< Save matched part of the string
             glob_st += regmatch[i].rm_eo;
         }
     }
@@ -324,6 +336,11 @@ int parse_first_line(char *cursor, regex_t *r, char *url, h_resp_t *p_resp) {
 }
 
 
+bool is_line_empty(char *line_start_ptr) {
+    return !strncmp(line_start_ptr, "\r\n", strlen("\r\n"));
+}   
+
+
 int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
     size_t line_no = 0;
 
@@ -333,10 +350,9 @@ int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
 
     char *cursor = h_st, *line_st;
     res[LINE] = regexec(&(r[LINE]), cursor, 1, &(regm[LINE]), 0);
+    cursor = line_st = &(cursor[regm[LINE].rm_so]);
 
-    for(; line_no == 0 || res[LINE] != REG_NOMATCH; line_no++) {
-        cursor = line_st = &(cursor[regm[LINE].rm_so]);
-
+    for(; (res[LINE] != REG_NOMATCH) && !is_line_empty(cursor); line_no++) {
         if(line_no == 0) {
             if((ret = parse_first_line(cursor, r, url, p_resp)) != SUCCESS) {
                 break;
@@ -346,14 +362,15 @@ int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
             res[LOC] = regexec(&(r[LOC]), cursor, 1, &(regm[LOC]), 0);
 
             if(res[LOC] != REG_NOMATCH) {
-                cursor = skip_w_spaces(cursor);
-                size_t len = (size_t)(&cursor[regm[LINE].rm_eo] - cursor);
+                cursor =  skip_w_spaces(&(cursor[regm[LOC].rm_eo]));
+                size_t len = (size_t)(&line_st[regm[LINE].rm_eo] - cursor);
                 p_resp->location = new_str_slice(cursor, len - strlen("\r\n"));
             }   
         }
 
         cursor = &(line_st[regm[LINE].rm_eo]);
         res[LINE] = regexec(&(r[LINE]), cursor, 1, &(regm[LINE]), 0);
+        cursor = line_st = &(cursor[regm[LINE].rm_so]);
     }
 
     if(line_no == 0 && ret == SUCCESS) {
@@ -365,7 +382,7 @@ int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
 }
 
 
-int parse_http_resp(string_t *response, h_resp_t *parsed_resp, char *url) {
+int parse_http_resp(h_resp_t *parsed_resp, string_t *response, char *url) {
     regex_t regexes[RE_H_RESP_NUM];
     regmatch_t regmatch[RE_H_RESP_NUM];
     int res[RE_H_RESP_NUM], ret = SUCCESS;
@@ -405,23 +422,49 @@ char *new_str(size_t size) {
 }
 
 
-list_el_t *new_element(char *string_content) {
+list_el_t *new_element(char *str_content, size_t indir_level) {
     list_el_t *new = (list_el_t *)malloc(sizeof(list_el_t));
     if(!new) {
         return NULL;
     }
 
-    new->string = new_string(strlen(string_content) + 1);
+    new->string = new_string(strlen(str_content) + 1);
     if(!new->string) {
         free(new);
         return NULL;
     }
 
-    if(!(new->string = set_string(&(new->string), string_content))) {
+    if(!(new->string = set_string(&(new->string), str_content))) {
         free(new);
         return NULL;
     }
 
+    new->indirect_lvl = indir_level;
+    new->next = NULL;
+
+    return new;
+}
+
+
+list_el_t *slice2element(string_slice_t *slice, size_t indir_level) {
+    list_el_t *new = (list_el_t *)malloc(sizeof(list_el_t));
+    if(!new) {
+        return NULL;
+    }
+
+    new->string = new_string(slice->len + 1);
+    if(!new->string) {
+        free(new);
+        return NULL;
+    }
+
+    new->string = set_stringn(&(new->string), slice->st, slice->len);
+    if(!new->string) {
+        free(new);
+        return NULL;
+    }
+
+    new->indirect_lvl = indir_level;
     new->next = NULL;
 
     return new;
@@ -480,6 +523,17 @@ string_t *new_string(size_t size) {
 }
 
 
+string_t *slice_to_string(string_slice_t *slice) {
+    string_t *string = new_string(slice->len + 1);
+    if(!string) {
+        return NULL;
+    }
+
+    string = set_stringn(&string, slice->st, slice->len);
+    return string;
+}
+
+
 string_t *ext_string(string_t *string) {
     const int coef = 2;
 
@@ -499,7 +553,11 @@ string_t *ext_string(string_t *string) {
 
 
 void erase_string(string_t *string) {
-    memset(string->str, 0, string->size);
+    if(string) {
+        if(string->str) {
+            memset(string->str, 0, string->size);
+        }
+    }
 }
 
 
@@ -533,9 +591,16 @@ string_t *app_char(string_t **dest, char c) {
 
 
 string_t *set_string(string_t **dest, char *src) {
+    if(*dest == NULL) {
+        *dest = new_string(strlen(src) + 1);
+        if(!(*dest)) {
+            return NULL;
+        }
+    }
+
     memset((*dest)->str, 0, (*dest)->size);
 
-    while((*dest)->size < strlen(src)) {
+    while((*dest)->size <= strlen(src)) {
         if(!(*dest = ext_string(*dest))) {
             return NULL;
         }
@@ -547,10 +612,25 @@ string_t *set_string(string_t **dest, char *src) {
 }
 
 
-void set_stringn(string_t *dest, char *src, size_t n) {
-    memset(dest->str, 0, dest->size);
+string_t *set_stringn(string_t **dest, char *src, size_t n) {
+    if(*dest == NULL) {
+        *dest = new_string(n + 1);
+        if(!(*dest)) {
+            return NULL;
+        }
+    }
 
-    strncpy(dest->str, src, n);
+    memset((*dest)->str, 0, (*dest)->size);
+
+    while((*dest)->size <= strlen(src)) {
+        if(!(*dest = ext_string(*dest))) {
+            return NULL;
+        }
+    }
+
+    strncpy((*dest)->str, src, n);
+
+    return *dest;
 }
 
 
