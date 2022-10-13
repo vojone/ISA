@@ -16,6 +16,7 @@
 #include <regex.h>
 #include <stdbool.h>
 #include <ctype.h>
+
 #include <sys/types.h>
 
 
@@ -42,8 +43,8 @@ enum err_codes {
 
 
 #define HTTP_REDIRECT -1
-
-#define MAX_REDIR_NUM 0
+#define MAX_REDIR_NUM 5
+#define TIMEOUT_S 5
 
 
 typedef struct string {

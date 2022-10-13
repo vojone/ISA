@@ -7,7 +7,7 @@
  * @date 6. 10. 2022
  */
 
-#include "utils.h"
+#include "common.h"
 
 
 void printerr(int err_code, const char *message_format,...) {

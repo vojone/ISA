@@ -14,20 +14,12 @@
 #include <ctype.h>
 #include <time.h>
 
-#include <openssl/bio.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 
-#include <sys/socket.h>
 
-#include <poll.h>
-
-
-#include "utils.h"
+#include "common.h"
 #include "cli.h"
+#include "http.h"
 
-#define TIMEOUT_S 5
 
