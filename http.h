@@ -15,7 +15,8 @@
 #include "common.h"
 #include "cli.h"
 
-#define HTTP_VERSION "HTTP/1.1"
+#define HTTP_VERSION "HTTP/1.0"
+
 
 void openssl_init();
 

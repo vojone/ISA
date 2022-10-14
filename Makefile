@@ -6,7 +6,7 @@ CFLAGS = -std=c99 -Wall -Wextra -pedantic -I/usr/include/libxml2
 CC = gcc
 SRCS = $(APP_NAME).c common.c cli.c http.c
 HEADERS = common.h cli.h http.h
-LDLIBS = -lssl -lcrypto
+LDLIBS = -lxml2 -lssl -lcrypto
 
 
 .PHONY: all feedreader debug clean

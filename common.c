@@ -21,6 +21,7 @@ void printerr(int err_code, const char *message_format,...) {
         "Path error",
         "Verification error",
         "HTTP error",
+        "Feed source error",
         "Internal error",
     };
 
@@ -169,7 +170,7 @@ int normalize_url(h_url_t *p_url, char* def_scheme_part_str) {
 
         url_parts[PATH] = set_string(dst, "/");
         if(!url_parts[PATH]) {
-            printerr(INTERNAL_ERROR, "Unabel to allocate buffer for path of URL!");
+            printerr(INTERNAL_ERROR, "Unable to allocate buffer for path of URL!");
             return INTERNAL_ERROR;
         }
     }
@@ -269,6 +270,7 @@ int prepare_resp_patterns(regex_t *regexes) {
         "^[0-9]{3}",
         "^[^\r\n]*",
         "^Location:",
+        "^Content-Type:",
     };
 
     for(int i = 0; i < RE_H_RESP_NUM; i++) {
@@ -341,6 +343,27 @@ bool is_line_empty(char *line_start_ptr) {
 }   
 
 
+void parse_hdrs(char *cursor, regex_t *r, char *line_end, h_resp_t *p_resp) {
+    int res[RE_H_RESP_NUM];
+    regmatch_t regm[RE_H_RESP_NUM];
+    init_res_arr(res, RE_H_RESP_NUM);
+
+    res[LOC] = regexec(&(r[LOC]), cursor, 1, &(regm[LOC]), 0);
+    if(res[LOC] != REG_NOMATCH) {
+        cursor =  skip_w_spaces(&(cursor[regm[LOC].rm_eo]));
+        size_t len = (size_t)(line_end - cursor);
+        p_resp->location = new_str_slice(cursor, len - strlen("\r\n"));
+    }
+
+    res[CON_TYPE] = regexec(&(r[CON_TYPE]), cursor, 1, &(regm[CON_TYPE]), 0);
+    if(res[CON_TYPE] != REG_NOMATCH) {
+        cursor =  skip_w_spaces(&(cursor[regm[CON_TYPE].rm_eo]));
+        size_t len = (size_t)(line_end - cursor);
+        p_resp->content_type = new_str_slice(cursor, len - strlen("\r\n"));
+    }
+}
+
+
 int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
     size_t line_no = 0;
 
@@ -359,13 +382,7 @@ int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
             }
         }
         else {
-            res[LOC] = regexec(&(r[LOC]), cursor, 1, &(regm[LOC]), 0);
-
-            if(res[LOC] != REG_NOMATCH) {
-                cursor =  skip_w_spaces(&(cursor[regm[LOC].rm_eo]));
-                size_t len = (size_t)(&line_st[regm[LINE].rm_eo] - cursor);
-                p_resp->location = new_str_slice(cursor, len - strlen("\r\n"));
-            }   
+            parse_hdrs(cursor, r, &line_st[regm[LINE].rm_eo], p_resp);
         }
 
         cursor = &(line_st[regm[LINE].rm_eo]);

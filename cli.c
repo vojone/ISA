@@ -53,11 +53,9 @@ void print_help() {
 }
 
 
-int rec_opt(char *cur_opt, opt_t *opt, settings_t *s) {
+int rec_opt(char opt_char, opt_t *opt, settings_t *s) {
     opt->flag = NULL;
     opt->arg = NULL;
-
-    char opt_char = shift(cur_opt, strlen("-"))[0];
 
     // All short options of the program
     switch(opt_char) {
@@ -162,7 +160,7 @@ int parse_opts(int argc, char **argv, settings_t *settings) {
     for(int i = 1; i < argc; i++) { //< Skip the first argument (it is the program name)
         char *current_opt = argv[i];
         int cur_char_i = 0;
-         if(current_opt[cur_char_i] != '-') { //< Argument without any option sign is url 
+        if(current_opt[cur_char_i] != '-') { //< Argument without any option sign is url 
             settings->url = current_opt;
             continue;
         }
@@ -173,19 +171,31 @@ int parse_opts(int argc, char **argv, settings_t *settings) {
         opt_t option = {.name = NULL, .flag = NULL, .arg = NULL};
         if(current_opt[cur_char_i] == '-') { //< Second character is also '-' => it is long option
             ret = rec_lopt(current_opt, &cur_char_i, &option, settings);
+            if(ret != SUCCESS) {
+                return ret;
+            }
+
+            // Set values associated with the option (flag/pointer to the argument)
+            ret = set_values(argc, argv, &i, &current_opt[cur_char_i], &option);
+            if(ret != SUCCESS) {
+                return ret;
+            }
         }
         else { //< Only first character is '-'
-            ret = rec_opt(current_opt, &option, settings);
-            cur_char_i++;
-        }
-        if(ret != SUCCESS) {
-            return ret;
-        }
 
-        // Set values associated with the option (flag/pointer to the argument)
-        ret = set_values(argc, argv, &i, &current_opt[cur_char_i], &option);
-        if(ret != SUCCESS) {
-            return ret;
+            while(current_opt[cur_char_i]) {
+                ret = rec_opt(current_opt[cur_char_i], &option, settings);
+                if(ret != SUCCESS) {
+                    return ret;
+                }
+                cur_char_i++;
+
+                // Set values associated with the option (flag/pointer to the argument)
+                ret = set_values(argc, argv, &i, &current_opt[cur_char_i], &option);
+                if(ret != SUCCESS) {
+                    return ret;
+                }
+            }
         }
     }
 

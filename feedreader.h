@@ -22,4 +22,19 @@
 #include "cli.h"
 #include "http.h"
 
+#define RSS_VERSION "2.0"
+
+typedef struct feed_el {
+    xmlChar *title;
+    xmlChar *auth_name;
+    xmlChar *updated;
+    xmlChar *url;
+    struct feed_el *next;
+} feed_el_t;
+
+typedef struct feed_doc {
+    xmlChar *src_name;
+    feed_el_t *feed;
+} feed_doc_t;
+
 

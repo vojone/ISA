@@ -55,25 +55,24 @@ int send_request(BIO *bio, h_url_t *p_url, char *url) {
 int rec_response(BIO *bio, string_t *resp_b, char *url) {
     int ret = 0;
 
-    char test_char;
     size_t emp_size = 0, total_b = 0;
 
     struct pollfd pfd;
     pfd.fd = BIO_get_fd(bio, NULL);
     pfd.events = POLLIN;
 
-    while(recv(BIO_get_fd(bio, NULL), &test_char, 1, MSG_PEEK) == 1) { //< Extend buffer until there is something on the input (there can be delay in case of SSL -> check it on the level of sockets)
+    while(ret > 0 || total_b == 0) { //< Extend buffer until there is something on the input
         emp_size = resp_b->size - total_b;
         while((ret = BIO_read(bio, &(resp_b->str[total_b]), emp_size)) <= 0) {
-            if(!BIO_should_read(bio)) { //< Checking if read should be repeated, but is BIO_should_read returns false if there is nothing to read anymore
-                if(total_b > 0) {
-                    return SUCCESS;
+            if(!BIO_should_retry(bio)) { //< Checking if read should be repeated, but is BIO_should_read returns false if there is nothing to read anymore
+                if(ret == 0) { //< Connection was closed
+                    break;
                 }
-
+                
                 printerr(COMMUNICATION_ERROR, "Unable to get response from the '%s'!", url);
                 return COMMUNICATION_ERROR;
             }
-            else {
+            else { //< Read can be retried -> try it again (using poll)
                 ret = poll(&pfd, 1, TIMEOUT_S);
                 if(ret && !(pfd.revents & POLLIN)) {
                     printerr(COMMUNICATION_ERROR, "Unable to get response from the '%s'!", url);
@@ -273,6 +272,9 @@ int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
 
     if(ret == HTTP_REDIRECT) {
         ret = http_redirect(p_resp, cur_url);
+        if(ret == SUCCESS) {
+            return HTTP_REDIRECT;
+        }
     }
 
     return ret;

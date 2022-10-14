@@ -126,6 +126,272 @@ int parse_feedfile(char *path, list_t *url_list) {
     return SUCCESS;
 }
 
+void init_feed_doc(feed_doc_t *feed_doc) {
+    feed_doc->src_name = NULL;
+    feed_doc->feed = NULL;
+}
+
+void add_feed(feed_doc_t *feed_doc, feed_el_t *new_feed) {
+    feed_el_t **feed = &(feed_doc->feed);
+
+    while(*feed) {
+        feed = &((*feed)->next);
+    }
+
+    *feed = new_feed;
+}
+
+feed_el_t *new_feed(feed_doc_t *feed_doc) {
+    feed_el_t *new_feed_ = (feed_el_t *)malloc(sizeof(feed_el_t));
+    if(!new_feed_) {
+        return NULL;
+    }
+
+    memset(new_feed_, 0, sizeof(feed_el_t));
+
+    if(feed_doc) {
+        add_feed(feed_doc, new_feed_);
+    }
+
+    return new_feed_;
+}
+
+void feed_dtor(feed_el_t *feed) {
+    if(feed) {
+        if(feed->auth_name) xmlFree(feed->auth_name);
+        if(feed->title) xmlFree(feed->title);
+        if(feed->updated) xmlFree(feed->updated);
+        if(feed->url) xmlFree(feed->url);
+        free(feed);
+    }
+}
+
+void feed_doc_dtor(feed_doc_t *feed_doc) {
+    if(feed_doc->src_name) xmlFree(feed_doc->src_name);
+
+    feed_el_t *feed = feed_doc->feed, *tmp;
+
+    while(feed) {
+        tmp = feed;
+        feed = feed->next;
+
+        feed_dtor(tmp);
+    }
+}
+
+int parse_and_print_feed(char *msg, settings_t *settings, char *url) {
+    xmlDocPtr xml = xmlReadMemory(msg, strlen(msg), url, NULL, 0);
+    if(!xml) {
+        printerr(INTERNAL_ERROR, "Unable to parse XML document from '%s'!", url);
+        return INTERNAL_ERROR;
+    }
+
+    xmlNodePtr root = xmlDocGetRootElement(xml);
+    if(!root) {
+        printerr(INTERNAL_ERROR, "Unable to find root node of XML document from '%s'!", url);
+        return INTERNAL_ERROR;
+    }
+
+    #ifdef DEBUG
+        fprintf(stderr, "Root: %s\n", root->name);
+    #endif
+
+    feed_el_t *cur_feed;
+    feed_doc_t feed_doc;
+    init_feed_doc(&feed_doc);
+
+    if(!xmlStrcasecmp(root->name, (const xmlChar *)"feed")) {
+        xmlNodePtr root_child = root->children, child, sub_child;
+
+        while(root_child) {
+            if(!xmlStrcasecmp(root_child->name, (const xmlChar *)"title")) {
+                if(!(feed_doc.src_name = xmlNodeGetContent(root_child))) {
+                    printerr(FEED_ERROR, "");
+                    feed_doc_dtor(&feed_doc);
+                    return FEED_ERROR;
+                }
+            }
+            else if(!xmlStrcasecmp(root_child->name, (const xmlChar *)"entry")) {
+                if(!(cur_feed = new_feed(&feed_doc))) {
+                    printerr(INTERNAL_ERROR, "Unable to allocate memory for feed structure!");
+                    feed_doc_dtor(&feed_doc);
+                    return INTERNAL_ERROR;
+                }
+                
+                child = root_child->children;
+
+                while(child) {
+                    if(!xmlStrcasecmp(child->name, (const xmlChar *)"title")) {
+                        if(!(cur_feed->title = xmlNodeGetContent(child))) {
+                            printerr(FEED_ERROR, "");
+                            feed_doc_dtor(&feed_doc);
+                            return FEED_ERROR;
+                        }
+            
+                    }
+                    else if(!xmlStrcasecmp(child->name, (const xmlChar *)"updated")) {
+                        if(!(cur_feed->updated = xmlNodeGetContent(child))) {
+                            printerr(FEED_ERROR, "");
+                            feed_doc_dtor(&feed_doc);
+                            return FEED_ERROR;
+                        }
+                    }
+                    else if(!xmlStrcasecmp(child->name, (const xmlChar *)"link")) {
+                        if(!(cur_feed->url = xmlGetProp(child, (const xmlChar *)"href"))) {
+                            printerr(FEED_ERROR, "");
+                            feed_doc_dtor(&feed_doc);
+                            return FEED_ERROR;
+                        }
+                    }
+                    else if(!xmlStrcasecmp(child->name, (const xmlChar *)"author")) {
+                        sub_child = child->children;
+
+                        while(sub_child) {
+                            if(!xmlStrcasecmp(sub_child->name, (const xmlChar *)"name")) {
+                                if(!(cur_feed->auth_name = xmlNodeGetContent(sub_child))) {
+                                    printerr(FEED_ERROR, "");
+                                    feed_doc_dtor(&feed_doc);
+                                    return FEED_ERROR;
+                                }
+                            }
+
+                            sub_child = sub_child->next;
+                        }
+                    }
+
+                    child = child->next;
+                }
+            }
+
+            root_child = root_child->next;
+        }
+    }
+    else if(!xmlStrcasecmp(root->name, (const xmlChar *)"rss")) {
+        xmlNodePtr channel = root->children, channel_child, item_child;  
+
+        xmlChar *v = xmlGetProp(root, (const xmlChar *)"version");
+        if(!v) {
+            printerr(FEED_ERROR, "Missing version attribute of 'rss' in rss tag!");
+            feed_doc_dtor(&feed_doc);
+            xmlFreeDoc(xml);
+            return FEED_ERROR;
+        }
+
+        bool is_supported = !xmlStrcasecmp(v, (const xmlChar *)RSS_VERSION);
+        xmlFree(v);
+
+        if(!is_supported) {
+            printerr(FEED_ERROR, "Unsupported version of RSS. Supported '%s' got '%s'!", RSS_VERSION, v);
+            feed_doc_dtor(&feed_doc);
+            xmlFreeDoc(xml);
+            return FEED_ERROR;
+        }
+
+        while(channel) {
+            if(!xmlStrcasecmp(channel->name, (const xmlChar *)"channel")) {
+                channel_child = channel->children;
+
+                while(channel_child) {
+                    if(!xmlStrcasecmp(channel_child->name, (const xmlChar *)"title")) {
+                        if(!(feed_doc.src_name = xmlNodeGetContent(channel_child))) {
+                            printerr(FEED_ERROR, "");
+                            feed_doc_dtor(&feed_doc);
+                            return FEED_ERROR;
+                        }
+                    }
+                    else if(!xmlStrcasecmp(channel_child->name, (const xmlChar *)"item")) {
+                        if(!(cur_feed = new_feed(&feed_doc))) {
+                            printerr(INTERNAL_ERROR, "Unable to allocate memory for feed structure!");
+                            feed_doc_dtor(&feed_doc);
+                            return INTERNAL_ERROR;
+                        }
+
+                        item_child = channel_child->children;
+
+                        while(item_child) {
+                            if(!xmlStrcasecmp(item_child->name, (const xmlChar *)"title")) {
+                                if(!(cur_feed->title = xmlNodeGetContent(item_child))) {
+                                    printerr(FEED_ERROR, "");
+                                    feed_doc_dtor(&feed_doc);
+                                    return FEED_ERROR;
+                                }
+                    
+                            }
+                            else if(!xmlStrcasecmp(item_child->name, (const xmlChar *)"link")) {
+                                if(!(cur_feed->url = xmlNodeGetContent(item_child))) {
+                                    printerr(FEED_ERROR, "");
+                                    feed_doc_dtor(&feed_doc);
+                                    return FEED_ERROR;
+                                }
+                            }
+                            else if(!xmlStrcasecmp(item_child->name, (const xmlChar *)"pubDate")) { //?
+                                if(!(cur_feed->updated = xmlNodeGetContent(item_child))) {
+                                    printerr(FEED_ERROR, "");
+                                    feed_doc_dtor(&feed_doc);
+                                    return FEED_ERROR;
+                                }
+                            }
+                            else if(!xmlStrcasecmp(item_child->name, (const xmlChar *)"author")) { //?
+                                if(!(cur_feed->auth_name = xmlNodeGetContent(item_child))) {
+                                    printerr(FEED_ERROR, "");
+                                    feed_doc_dtor(&feed_doc);
+                                    return FEED_ERROR;
+                                }
+                            }
+                            
+
+                            item_child = item_child->next;
+                        }
+                    }
+
+                    channel_child = channel_child->next;
+                }
+            }
+
+            channel = channel->next;
+        }
+    }
+    else {
+        printerr(FEED_ERROR, "Unexpected name of root element of XML from '%s'! Expected feed/rss", url);
+        feed_doc_dtor(&feed_doc);
+        xmlFreeDoc(xml);
+        return FEED_ERROR;
+    }
+
+
+    printf("*** %s ***\n", feed_doc.src_name);
+
+    feed_el_t *feed = feed_doc.feed;
+    while(feed) {
+        printf("%s\n", feed->title);
+
+        if(feed->auth_name && settings->author_flag) {
+            printf("%s\n", feed->auth_name);
+        }
+        if(feed->url && settings->asoc_url_flag) {
+            printf("%s\n", feed->url);
+        }
+        if(feed->updated && settings->time_flag) {
+            printf("%s\n", feed->updated);
+        }
+
+        if(settings->author_flag || 
+            settings->asoc_url_flag || 
+            settings->time_flag) {
+            printf("\n");
+        }
+
+        feed = feed->next;
+    }
+
+
+    feed_doc_dtor(&feed_doc);
+    xmlFreeDoc(xml);
+
+    return SUCCESS;
+}
+
+
 int read_and_print_feed(list_t *url_list, settings_t *settings) {
     list_el_t *current = url_list->header;
     int ret = SUCCESS;
@@ -169,7 +435,16 @@ int read_and_print_feed(list_t *url_list, settings_t *settings) {
         }
 
         ret = check_http_resp(&parsed_resp, current, url);
-        if(ret != SUCCESS) {
+        if(ret == SUCCESS) {
+            ret = parse_and_print_feed(parsed_resp.msg, settings, url);
+            if(ret != SUCCESS) {
+                break;
+            }
+        }
+        else if(ret == HTTP_REDIRECT) {
+
+        }
+        else {
             break;
         }
 
@@ -178,9 +453,9 @@ int read_and_print_feed(list_t *url_list, settings_t *settings) {
             fprintf(stderr, "Status: %ld %ld\n", parsed_resp.status.st - resp_buff->str, parsed_resp.status.len);
             fprintf(stderr, "Phrase: %ld %ld\n", parsed_resp.phrase.st - resp_buff->str, parsed_resp.phrase.len);
             fprintf(stderr, "Loc: %ld %ld\n", parsed_resp.location.st - resp_buff->str, parsed_resp.location.len);
-            fprintf(stderr, "Msg: %s\n", parsed_resp.msg);
+            fprintf(stderr, "CType: %ld %ld\n", parsed_resp.content_type.st - resp_buff->str, parsed_resp.content_type.len);
+            //fprintf(stderr, "Msg: %s\n", parsed_resp.msg);
         #endif
-
 
         current = current->next;
     }
@@ -193,6 +468,8 @@ int read_and_print_feed(list_t *url_list, settings_t *settings) {
 
 
 int main(int argc, char **argv) {
+    LIBXML_TEST_VERSION
+
     int ret_code = SUCCESS;
 
     settings_t settings;
@@ -240,6 +517,7 @@ int main(int argc, char **argv) {
     }
 
     list_dtor(&url_list);
+    xmlCleanupParser();
 
     return ret_code;
 }

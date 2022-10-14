@@ -38,6 +38,7 @@ enum err_codes {
     PATH_ERROR,
     VERIFICATION_ERROR,
     HTTP_ERROR,
+    FEED_ERROR,
     INTERNAL_ERROR,
 };
 
@@ -95,6 +96,7 @@ enum re_h_resp_indexes {
     STAT,
     PHR,
     LOC,
+    CON_TYPE,
     RE_H_RESP_NUM, //< Maximum amount of tokens in URL 
 };
 
@@ -104,6 +106,7 @@ typedef struct h_resp {
     string_slice_t status;
     string_slice_t phrase;
     string_slice_t location;
+    string_slice_t content_type;
     char *msg;
 }   h_resp_t;
 
