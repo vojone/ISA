@@ -490,7 +490,6 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
 }
 
 
-
 int prepare_resp_patterns(regex_t *regexes) {
     char *patterns[] = { //< There is always ^ because we always match pattern from start of the string 
         "^(.|\r\n)*\r\n\r\n",
@@ -512,87 +511,103 @@ int prepare_resp_patterns(regex_t *regexes) {
     return SUCCESS;
 }
 
-
-void parse_hdrs(char *cursor, regex_t *r, char *line_end, h_resp_t *p_resp) {
-    int res[RE_H_RESP_NUM];
+typedef struct resp_parse_ctx {
+    regex_t regexes[RE_H_RESP_NUM];
+    char *cursor;
     regmatch_t regm[RE_H_RESP_NUM];
-    init_res_arr(res, RE_H_RESP_NUM);
+    int res[RE_H_RESP_NUM];
+} resp_parse_ctx_t;
 
-    res[LOC] = regexec(&(r[LOC]), cursor, 1, &(regm[LOC]), 0);
+
+void parse_hdrs(char *line_end, resp_parse_ctx_t *ctx, h_resp_t *p_resp) {
+    regex_t *regexes = ctx->regexes;
+    regmatch_t *matches = ctx->regm;
+    int *res = ctx->res;
+    char **cursor = &(ctx->cursor);
+
+    res[LOC] = regexec(&(regexes[LOC]), *cursor, 1, &(matches[LOC]), 0);
     if(res[LOC] != REG_NOMATCH) {
-        cursor =  skip_w_spaces(&(cursor[regm[LOC].rm_eo]));
-        size_t len = (size_t)(line_end - cursor);
-        p_resp->location = new_str_slice(cursor, len - strlen("\r\n"));
+        *cursor =  skip_w_spaces(&((*cursor)[matches[LOC].rm_eo]));
+        size_t len = (size_t)(line_end - *cursor);
+        p_resp->location = new_str_slice(*cursor, len - strlen("\r\n"));
     }
 
-    res[CON_TYPE] = regexec(&(r[CON_TYPE]), cursor, 1, &(regm[CON_TYPE]), 0);
+    regex_t *con_type_r = &(regexes[CON_TYPE]);
+    res[CON_TYPE] = regexec(con_type_r, *cursor, 1, &(matches[CON_TYPE]), 0);
     if(res[CON_TYPE] != REG_NOMATCH) {
-        cursor =  skip_w_spaces(&(cursor[regm[CON_TYPE].rm_eo]));
-        size_t len = (size_t)(line_end - cursor);
-        p_resp->content_type = new_str_slice(cursor, len - strlen("\r\n"));
+        *cursor =  skip_w_spaces(&((*cursor)[matches[CON_TYPE].rm_eo]));
+        size_t len = (size_t)(line_end - *cursor);
+        p_resp->content_type = new_str_slice(*cursor, len - strlen("\r\n"));
     }
 }
 
 
-int parse_first_line(char *cursor, regex_t *r, char *url, h_resp_t *p_resp) {
-    int res[RE_H_RESP_NUM];
-    regmatch_t regmatch[RE_H_RESP_NUM];
-    init_res_arr(res, RE_H_RESP_NUM);
+int parse_first_line(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *url) {
+    regex_t *regexes = ctx->regexes;
+    regmatch_t *matches = ctx->regm;
+    int *res = ctx->res;
+    char **cursor = &(ctx->cursor);
 
-    res[VER] = regexec(&(r[VER]), cursor, 1, &(regmatch[VER]), 0);
+    res[VER] = regexec(&(regexes[VER]), *cursor, 1, &(matches[VER]), 0);
     if(res[VER] != REG_NOMATCH) {
-        p_resp->version = new_str_slice(cursor, regmatch[VER].rm_eo - regmatch[VER].rm_so);
-        cursor = &(cursor[regmatch[VER].rm_eo]);
+        size_t version_len = matches[VER].rm_eo - matches[VER].rm_so;
+        p_resp->version = new_str_slice(*cursor, version_len);
+        *cursor = &((*cursor)[matches[VER].rm_eo]);
     }
 
-    cursor = skip_w_spaces(cursor);
-    res[STAT] = regexec(&(r[STAT]), cursor, 1, &(regmatch[STAT]), 0);
+    *cursor = skip_w_spaces(*cursor);
+    res[STAT] = regexec(&(regexes[STAT]), *cursor, 1, &(matches[STAT]), 0);
     if(res[STAT] == REG_NOMATCH) {
-        printerr(HTTP_ERROR, "Unable to find status code in reponse from '%s'!", cursor);
+        printerr(HTTP_ERROR, "Unable to find status code in reponse from '%s'!", *cursor);
         return HTTP_ERROR;
     }
 
-    p_resp->status = new_str_slice(cursor, regmatch[STAT].rm_eo - regmatch[STAT].rm_so);
-    cursor = &(cursor[regmatch[STAT].rm_eo]);
+    size_t status_len = matches[STAT].rm_eo - matches[STAT].rm_so;
+    p_resp->status = new_str_slice(*cursor, status_len);
+    *cursor = &((*cursor)[matches[STAT].rm_eo]);
 
-    cursor = skip_w_spaces(cursor);
-    res[PHR] = regexec(&(r[PHR]), cursor, 1, &(regmatch[PHR]), 0);
+    *cursor = skip_w_spaces(*cursor);
+    res[PHR] = regexec(&(regexes[PHR]), *cursor, 1, &(matches[PHR]), 0);
     if(res[PHR] == REG_NOMATCH) {
         printerr(HTTP_ERROR, "Unable to find status phrase in reponse from '%s'!", url);
         return HTTP_ERROR;
     }
 
-    p_resp->phrase = new_str_slice(cursor, regmatch[PHR].rm_eo - regmatch[PHR].rm_so);
-    cursor = &(cursor[regmatch[PHR].rm_eo]);
+    size_t phrase_len = matches[PHR].rm_eo - matches[PHR].rm_so;
+    p_resp->phrase = new_str_slice(*cursor, phrase_len);
+    *cursor = &((*cursor)[matches[PHR].rm_eo]);
 
     return SUCCESS;
 }
 
 
-int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
+int parse_resp_headers(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *hdrs_start, char *url) {
     size_t line_no = 0;
 
-    int res[RE_H_RESP_NUM], ret = SUCCESS;
-    regmatch_t regm[RE_H_RESP_NUM];
-    init_res_arr(res, RE_H_RESP_NUM);
+    int ret = SUCCESS;
+    regex_t *regexes = ctx->regexes;
+    regmatch_t *matches = ctx->regm;
+    int *res = ctx->res;
+    char **cursor = &(ctx->cursor);
 
-    char *cursor = h_st, *line_st;
-    res[LINE] = regexec(&(r[LINE]), cursor, 1, &(regm[LINE]), 0);
-    cursor = line_st = &(cursor[regm[LINE].rm_so]);
+    char *line_st;
+    *cursor = hdrs_start;
+    res[LINE] = regexec(&(regexes[LINE]), *cursor, 1, &(matches[LINE]), 0);
+    *cursor = line_st = &((*cursor)[matches[LINE].rm_so]);
 
-    for(; (res[LINE] != REG_NOMATCH) && !is_line_empty(cursor); line_no++) {
+    for(; (res[LINE] != REG_NOMATCH) && !is_line_empty(*cursor); line_no++) {
         if(line_no == 0) {
-            if((ret = parse_first_line(cursor, r, url, p_resp)) != SUCCESS) {
+            if((ret = parse_first_line(ctx, p_resp, url)) != SUCCESS) {
                 break;
             }
         }
         else {
-            parse_hdrs(cursor, r, &line_st[regm[LINE].rm_eo], p_resp);
+            parse_hdrs(&line_st[matches[LINE].rm_eo], ctx, p_resp);
         }
 
-        cursor = &(line_st[regm[LINE].rm_eo]);
-        res[LINE] = regexec(&(r[LINE]), cursor, 1, &(regm[LINE]), 0);
-        cursor = line_st = &(cursor[regm[LINE].rm_so]);
+        *cursor = &(line_st[matches[LINE].rm_eo]);
+        res[LINE] = regexec(&(regexes[LINE]), *cursor, 1, &(matches[LINE]), 0);
+        *cursor = line_st = &((*cursor)[matches[LINE].rm_so]);
     }
 
     if(line_no == 0 && ret == SUCCESS) {
@@ -605,26 +620,29 @@ int parse_resp_headers(char *h_st, regex_t *r, char *url, h_resp_t *p_resp) {
 
 
 int parse_http_resp(h_resp_t *parsed_resp, string_t *response, char *url) {
-    regex_t regexes[RE_H_RESP_NUM];
-    regmatch_t regmatch[RE_H_RESP_NUM];
-    int res[RE_H_RESP_NUM], ret = SUCCESS;
+    resp_parse_ctx_t ctx;
+    int ret = SUCCESS;
     char *resp = response->str;
+
+    regex_t *regexes = ctx.regexes;
+    regmatch_t *matches = ctx.regm;
+    int *res = ctx.res;
 
     if((ret = prepare_resp_patterns(regexes)) != SUCCESS) { //< Preparation of POSIX regex structures
         return ret;
     }
 
-    init_res_arr(res, RE_H_RESP_NUM);
+    init_res_arr(ctx.res, RE_H_RESP_NUM);
 
-    res[H_PART] = regexec(&regexes[H_PART], resp, 1, &(regmatch[H_PART]), 0);
+    res[H_PART] = regexec(&regexes[H_PART], resp, 1, &(matches[H_PART]), 0);
 
     if(res[H_PART] == REG_NOMATCH) {
         printerr(HTTP_ERROR, "Headers of HTTP response from '%s' was not found!", url);
         ret = HTTP_ERROR;
     }
     else {
-        parsed_resp->msg = &(resp[regmatch[H_PART].rm_eo]);
-        ret = parse_resp_headers(resp, regexes, url, parsed_resp);
+        parsed_resp->msg = &(resp[matches[H_PART].rm_eo]);
+        ret = parse_resp_headers(&ctx, parsed_resp, response->str, url);
     }
 
     free_all_patterns(regexes, RE_H_RESP_NUM);

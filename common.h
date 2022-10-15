@@ -29,6 +29,8 @@
 #define MAX_REDIR_NUM 5
 #define TIMEOUT_S 5
 
+#define ABS(x) (unsigned int)((x > 0) ? x : -x)
+
 
 typedef struct string {
     char *str;
@@ -53,8 +55,6 @@ typedef struct list {
     list_el_t *header;
 } list_t;
 
-
-#define ABS(x) (unsigned int)((x > 0) ? x : -x)
 
 bool is_empty(string_t *string);
 
