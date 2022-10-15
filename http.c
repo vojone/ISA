@@ -325,6 +325,7 @@ void init_h_resp(h_resp_t *h_resp) {
 
 int prepare_url_patterns(regex_t *regexes) {
     //Patterns are based on RFC3986
+    //http-URI = "http" "://" authority path-abempty [ "?" query ] ("#" [fragment]) (see RFC9110)
     char *patterns[] = {
         "^(http|https)://",
         "(" UNRESERVED "|" SUBDELIMS "|:|(" PCTENCODED "))+@",
@@ -502,7 +503,8 @@ int prepare_resp_patterns(regex_t *regexes) {
     };
 
     for(int i = 0; i < RE_H_RESP_NUM; i++) {
-        if(regcomp(&(regexes[i]), patterns[i], REG_EXTENDED | REG_NEWLINE)) { //< We will need extended posix notation and case insensitive matching 
+        int comp_flags = REG_EXTENDED | REG_NEWLINE | REG_ICASE; //< We will need extended posix notation and case insensitive matching (for better robustness) 
+        if(regcomp(&(regexes[i]), patterns[i], comp_flags)) {
             printerr(INTERNAL_ERROR, "Invalid compilation of response regexes! %d", i);
             return INTERNAL_ERROR;
         }

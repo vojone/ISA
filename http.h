@@ -1,7 +1,6 @@
 #ifndef _FEEDREADER_HTTP_
 #define _FEEDREADER_HTTP_
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <poll.h>
@@ -16,9 +15,11 @@
 #include "common.h"
 #include "cli.h"
 
-#define HTTP_VERSION "HTTP/1.0"
+#define HTTP_REDIRECT -1 //< Return value signalizing http redirection 
+#define MAX_REDIR_NUM 5 //< Maximum amount of redirections to prevent redirection cycle
+#define TIMEOUT_S 5 //< Maximum time in sec for waiting for the writing/reading from BIO socket
 
-//http-URI = "http" "://" authority path-abempty [ "?" query ] ("#" [fragment]) (see RFC9110)
+#define HTTP_VERSION "HTTP/1.0" //< HTTP version
 
 //Based on RFC3986
 #define HEXDIG "[0-9a-f]"

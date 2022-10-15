@@ -1,3 +1,13 @@
+/**
+ * @file feed.c
+ * @brief Header file of feed module (mod. for parsing and printing XML 
+ * with RSS2/Atom feeds)
+ * @note Uses libxml2 library to parse XML docs
+ * 
+ * @author Vojtěch Dvořák (xdvora3o)
+ * @date 15. 10. 2022 
+ */
+
 #ifndef _FEEDREADER_FEED_
 #define _FEEDREADER_FEED_
 
@@ -14,10 +24,7 @@
 #define RSS_VERSION "2.0"
 
 typedef struct feed_el {
-    xmlChar *title;
-    xmlChar *auth_name;
-    xmlChar *updated;
-    xmlChar *url;
+    xmlChar *title, *auth_name, *updated, *url;
     struct feed_el *next;
 } feed_el_t;
 

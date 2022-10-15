@@ -1,3 +1,12 @@
+/**
+ * @file feed.c
+ * @brief Implementation of feed module (mod. for parsing and printing XML with
+ * RSS2/Atom feeds)
+ * 
+ * @author Vojtěch Dvořák (xdvora3o)
+ * @date 15. 10. 2022 
+ */
+
 #include "feed.h"
 
 void xml_parser_init() {

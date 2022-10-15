@@ -1,9 +1,11 @@
 /**
  * @file cli.h
- * @brief Header file of cli module
+ * @brief Header file of cli module - responsible for communication with user
+ * @note There are only declarations of exported functions and structures (
+ * there are also internal functions/structures in cli.c file)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 6. 10. 2022
+ * @date 15. 10. 2022
  */
 
 
@@ -16,10 +18,17 @@
 #include <stdarg.h>
 #include <string.h>
 
-#define PROGNAME "feedreader"
 
+#define PROGNAME "feedreader" //< The name of the program for better filtering of error/warning messages
+
+#define CLI_WARNINGS //< Comment to turn off warnings
+
+/**
+ * @brief Error codes, that can be returned by program
+ * 
+ */
 enum err_codes {
-    SUCCESS,
+    SUCCESS, //< Everything went OK
     USAGE_ERROR,
     FILE_ERROR,
     URL_ERROR,
@@ -29,37 +38,69 @@ enum err_codes {
     VERIFICATION_ERROR,
     HTTP_ERROR,
     FEED_ERROR,
-    INTERNAL_ERROR,
+    INTERNAL_ERROR, //< Reserved for allocation errors and other similar errors
 };
 
 
 /**
- * @brief Structure with information about used options in program-firendly
- * format (e. g. the result of the options parsing)
+ * @brief Structure with information about arguments of the program 
+ * in program-firendly format (e. g. the result of the options parsing)
+ * 
  */
 typedef struct settings {
-    char *url, *feedfile;
+    char *url, *feedfile; //< Options with argument (or it is signle argument of program - such as url)
     char *certfile, *certaddr;
-    bool time_flag, author_flag, asoc_url_flag, help_flag; 
+    bool time_flag, author_flag, asoc_url_flag, help_flag; //< Options without arguments
 } settings_t;
 
 
 void init_settings(settings_t *settings);
 
+
 /**
- * @brief Prints formated error message to the output
+ * @brief Prints formated error message to the stderr
  * 
- * @param err_code 
- * @param message 
+ * @param err_code Error code of the error (value from err_codes enum)
+ * @param message Auxiliary format of message of the error
+ * @param ... 
  */
 void printerr(int err_code, const char *message,...);
 
+
+/**
+ * @brief Prints warning message to stderr (macro CLI_WARNINGS must be defined)
+ * 
+ * @param message Format of message of the warning
+ * @param ... 
+ */
 void printw(const char *message,...);
 
+
+/**
+ * @brief Prints usage infromation to stdout
+ * 
+ */
 void print_usage();
 
+
+/**
+ * @brief Prints help message to stdout
+ * 
+ */
 void print_help();
 
+
+/**
+ * @brief Parses options of the program (short options and long options
+ * must be firstly defined by implementation in internal functions rec_lopt and
+ * rec_opt) and sets settings structure 
+ * 
+ * @param argc Argument count from main function of the program
+ * @param argv Argument vector from the main function of the program
+ * @param settings Initialized settings structure for result
+ * @return Returns SUCCESS if everything went OK (all options were recognized and
+ * their arguments were found), otherwise USAGE error
+ */
 int parse_opts(int argc, char **argv, settings_t *settings);
 
 

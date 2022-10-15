@@ -34,11 +34,13 @@ int validate_settings(settings_t *settings) {
 
 
 int move_to_list(string_t *buffer, list_t *dst_list) {
-    list_el_t *new_url = new_element(buffer->str, 0);
+    list_el_t *new_url = new_element(buffer->str);
     if(!new_url) {
         printerr(INTERNAL_ERROR, "Unable to move '%s' to the list!", buffer->str);
         return INTERNAL_ERROR;
     }
+
+    new_url->indirect_lvl = 0; //< It is original URL
 
     list_append(dst_list, new_url);
     erase_string(buffer);
@@ -225,12 +227,13 @@ int create_url_list(list_t *url_list, settings_t *settings) {
         ret_code = parse_feedfile(settings->feedfile, url_list);
     }
     else if(settings->url) {
-        list_el_t *first = new_element(settings->url, 0);
+        list_el_t *first = new_element(settings->url);
         if(!first) {
             printerr(INTERNAL_ERROR, "Unable to allocate new element for url list!");
             ret_code = INTERNAL_ERROR;
         }
         else {
+            first->indirect_lvl = 0; //< It is original URL
             list_append(url_list, first);
         }
     }
