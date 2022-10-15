@@ -1,3 +1,13 @@
+/**
+ * @file feedreader.h
+ * @brief Header file of http module - contains functions and structures
+ * related to HTTP protocol and its secure variant - HTTPs
+ * @note Uses opensll library
+ * 
+ * @author Vojtěch Dvořák (xdvora3o)
+ * @date 15. 10. 2022
+ */
+
 #ifndef _FEEDREADER_HTTP_
 #define _FEEDREADER_HTTP_
 
@@ -57,14 +67,22 @@ enum re_h_url_indexes {
 };
 
 
+/**
+ * @brief Structure with parts of HTTP url
+ * 
+ */
 typedef struct h_url {
     string_t *h_url_parts[RE_H_URL_NUM];
 } h_url_t;
 
 
+/**
+ * @brief Indexes of HTTP response parts (for better referencing them in the code)
+ * 
+ */
 enum re_h_resp_indexes {
-    H_PART,
-    LINE,
+    H_PART, //< Part with headers
+    LINE, //< Line with hdr
     VER,
     STAT,
     PHR,
@@ -74,13 +92,17 @@ enum re_h_resp_indexes {
 };
 
 
+/**
+ * @brief Structure holding information about parsed HTTP response
+ * 
+ */
 typedef struct h_resp {
     string_slice_t version;
     string_slice_t status;
     string_slice_t phrase;
     string_slice_t location;
     string_slice_t content_type;
-    char *msg;
+    char *msg; //< Ptr to the start of the response message
 }   h_resp_t;
 
 

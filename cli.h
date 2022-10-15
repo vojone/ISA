@@ -48,7 +48,7 @@ enum err_codes {
  * 
  */
 typedef struct settings {
-    char *url, *feedfile; //< Options with argument (or it is signle argument of program - such as url)
+    char *url, *feedfile; //< Options with argument (or it is single argument of program - such as url)
     char *certfile, *certaddr;
     bool time_flag, author_flag, asoc_url_flag, help_flag; //< Options without arguments
 } settings_t;

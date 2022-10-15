@@ -1,3 +1,14 @@
+/**
+ * @file feedreader.c
+ * @brief Source file with functions related to the HTTP(s) connection of
+ * feedreader program
+ * @note Uses opensll library
+ * 
+ * @author Vojtěch Dvořák (xdvora3o)
+ * @date 15. 10. 2022
+ */
+
+
 #include "http.h"
 
 

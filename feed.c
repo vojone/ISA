@@ -9,6 +9,7 @@
 
 #include "feed.h"
 
+
 void xml_parser_init() {
     LIBXML_TEST_VERSION
 }
@@ -28,7 +29,7 @@ void init_feed_doc(feed_doc_t *feed_doc) {
 void add_feed(feed_doc_t *feed_doc, feed_el_t *new_feed) {
     feed_el_t **feed = &(feed_doc->feed);
 
-    while(*feed) {
+    while(*feed) { //< Go to the end of the linked list
         feed = &((*feed)->next);
     }
 
@@ -42,7 +43,7 @@ feed_el_t *new_feed(feed_doc_t *feed_doc) {
         return NULL;
     }
 
-    memset(new_feed_, 0, sizeof(feed_el_t));
+    memset(new_feed_, 0, sizeof(feed_el_t)); //< Initialization of structure
 
     if(feed_doc) {
         add_feed(feed_doc, new_feed_);
@@ -68,7 +69,7 @@ void feed_doc_dtor(feed_doc_t *feed_doc) {
 
     feed_el_t *feed = feed_doc->feed, *tmp;
 
-    while(feed) {
+    while(feed) { //< Deallocate whole linked list
         tmp = feed;
         feed = feed->next;
 
@@ -77,136 +78,172 @@ void feed_doc_dtor(feed_doc_t *feed_doc) {
 }
 
 
+/**
+ * @brief Determines whether XML node has given name or not
+ * 
+ * @param node Node to be checked
+ * @param name String against the check is done 
+ * @return true If tag name of node is same as given string
+ * @return false Otherwise
+ */
 bool hasName(xmlNodePtr node, const char *name) {
     return !xmlStrcasecmp(node->name, (const xmlChar *)name); //< Tag names are case insensitive
 }
 
 
+/**
+ * @brief Parses atom entry XML structure
+ * 
+ * @param cur_feed Current feed structure to be filled with data 
+ * @param entry 'Root' node of entry
+ * @return int SUCCESS of FEED_ERROR
+ */
 int parse_atom_entry(feed_el_t *cur_feed, xmlNodePtr entry) {
     xmlNodePtr child, sub_child;
 
     child = entry->children;
 
-    while(child) {
+    while(child) { //< Try to find given tags
         if(hasName(child, "title")) {
             if(!(cur_feed->title = xmlNodeGetContent(child))) {
-                printerr(FEED_ERROR, "");
+                printerr(FEED_ERROR, "Unable to get content of 'title' tag!");
                 return FEED_ERROR;
             }
         }
         else if(hasName(child, "updated")) {
             if(!(cur_feed->updated = xmlNodeGetContent(child))) {
-                printerr(FEED_ERROR, "");
+                printerr(FEED_ERROR, "Unable to get content of 'updated' tag!");
                 return FEED_ERROR;
             }
         }
         else if(hasName(child, "link")) {
             if(!(cur_feed->url = xmlGetProp(child, (const xmlChar *)"href"))) {
-                printerr(FEED_ERROR, "");
+                printerr(FEED_ERROR, "Unable to get content of 'link' tag!");
                 return FEED_ERROR;
             }
         }
-        else if(hasName(child, "author")) {
+        else if(hasName(child, "author")) { //< Go inside author tag (there can be name and email)
             sub_child = child->children;
 
             while(sub_child) {
                 if(hasName(sub_child, "name")) {
                     if(!(cur_feed->auth_name = xmlNodeGetContent(sub_child))) {
-                        printerr(FEED_ERROR, "");
+                        printerr(FEED_ERROR, "Unable to get ");
                         return FEED_ERROR;
                     }
                 }
 
-                sub_child = sub_child->next;
+                sub_child = sub_child->next; //< Go to the next sibling
             }
         }
 
-        child = child->next;
+        child = child->next; //< Go to the next sibling
     }
 
     return SUCCESS;
 }
 
 
+/**
+ * @brief Parses feed in atom format (parsing is done due to spec from RFC4287)
+ * 
+ * @param root Root node of XML document
+ * @param feed_doc Feed document structure to be filled with data (output param)
+ * @return int SUCCESS if everything went OK
+ */
 int parse_atom(xmlNodePtr root, feed_doc_t *feed_doc) {
     int ret;
     feed_el_t *cur_feed;
     xmlNodePtr root_child = root->children;
 
-    while(root_child) {
+    while(root_child) { //< Perform search in root child
         if(hasName(root_child, "title")) {
             if(!(feed_doc->src_name = xmlNodeGetContent(root_child))) {
                 printerr(FEED_ERROR, "");
                 return FEED_ERROR;
             }
         }
-        else if(hasName(root_child, "entry")) {
+        else if(hasName(root_child, "entry")) { //< Entry was found
             if(!(cur_feed = new_feed(feed_doc))) {
                 printerr(INTERNAL_ERROR, "Unable to allocate memory for feed structure!");
                 return INTERNAL_ERROR;
             }
             
-            ret = parse_atom_entry(cur_feed, root_child);
+            ret = parse_atom_entry(cur_feed, root_child); //< Parse it
             if(ret != SUCCESS) {
                 return ret;
             }
         }
 
-        root_child = root_child->next;
+        root_child = root_child->next; //< Go to the next child of the root node
     }
 
     return SUCCESS;
 }
 
 
+/**
+ * @brief Parses item structure of document in RSS format
+ * 
+ * @param item Pointer to the item node
+ * @param cur_feed Feed sctructure to be filled with data
+ * @return int SUCCESS if everything went OK
+ */
 int parse_rss_item(xmlNodePtr item, feed_el_t *cur_feed) {
     xmlNodePtr item_child = item->children;
 
     while(item_child) {
         if(hasName(item_child, "title")) {
             if(!(cur_feed->title = xmlNodeGetContent(item_child))) {
-                printerr(FEED_ERROR, "");
+                printerr(FEED_ERROR, "Unable to get content of the 'title' tag!");
                 return FEED_ERROR;
             }
         }
         else if(hasName(item_child, "link")) {
             if(!(cur_feed->url = xmlNodeGetContent(item_child))) {
-                printerr(FEED_ERROR, "");
+                printerr(FEED_ERROR, "Unable to get content of the 'link' tag!");
                 return FEED_ERROR;
             }
         }
         else if(hasName(item_child, "pubDate")) { //?
             if(!(cur_feed->updated = xmlNodeGetContent(item_child))) {
-                printerr(FEED_ERROR, "");
+                printerr(FEED_ERROR, "Unable to get content of the 'pubDate' tag!");
                 return FEED_ERROR;
             }
         }
         else if(hasName(item_child, "author")) { //?
             if(!(cur_feed->auth_name = xmlNodeGetContent(item_child))) {
-                printerr(FEED_ERROR, "");
+                printerr(FEED_ERROR, "Unable to get content of the 'author' tag!");
                 return FEED_ERROR;
             }
         }
         
-        item_child = item_child->next;
+        item_child = item_child->next; //< Go to the next sibling
     }
 
     return SUCCESS;
 }
 
 
+/**
+ * @brief Parses XML document in RSS2.0 format (specificated e. g. here: https://validator.w3.org/feed/docs/rss2.html) 
+ * 
+ * @param root The root node of the document
+ * @param feed_doc Feed document to be filled with data
+ * @return int SUCCESS if everything went OK
+ */
 int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
     int ret;
     feed_el_t *cur_feed;
     xmlNodePtr channel = root->children, channel_child;  
 
-    xmlChar *v = xmlGetProp(root, (const xmlChar *)"version");
+    xmlChar *v = xmlGetProp(root, (const xmlChar *)"version"); //< Get version attribute
     if(!v) {
         printerr(FEED_ERROR, "Missing mandatory version attribute of 'rss' in rss tag!");
         return FEED_ERROR;
     }
 
-    bool is_supported = !xmlStrcasecmp(v, (const xmlChar *)RSS_VERSION);
+    bool is_supported = !xmlStrcasecmp(v, (const xmlChar *)RSS_VERSION); //< Check RSS version (mandatory tag)
     xmlFree(v);
 
     if(!is_supported) {
@@ -214,11 +251,11 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
         return FEED_ERROR;
     }
 
-    while(channel) {
+    while(channel) { //< There should be maximum one and only one channel tag (but ,for better robustness, mutliple of them are accepted )
         if(hasName(channel, "channel")) {
             channel_child = channel->children;
 
-            while(channel_child) {
+            while(channel_child) { //< Search all nodes inside channel tag
                 if(hasName(channel_child, "title")) {
                     feed_doc->src_name = xmlNodeGetContent(channel_child);
                     if(!feed_doc->src_name) {
@@ -238,11 +275,11 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
                     }
                 }
 
-                channel_child = channel_child->next;
+                channel_child = channel_child->next; //< Go to the next child of channel tag
             }
         }
 
-        channel = channel->next;
+        channel = channel->next; //< Shouldn't be used (but for better robustness it is here)
     }
 
     return SUCCESS;
@@ -252,18 +289,19 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
 int parse_feed_doc(feed_doc_t *feed_doc, char *feed, char *url) {
     int ret;
 
-    xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, 0);
+    xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, 0); //< PArse document by libxml2
     if(!xml) {
         printerr(INTERNAL_ERROR, "Unable to parse XML document from '%s'!", url);
         return INTERNAL_ERROR;
     }
 
-    xmlNodePtr root = xmlDocGetRootElement(xml);
+    xmlNodePtr root = xmlDocGetRootElement(xml); //< Get The root element of XML doc
     if(!root) {
         printerr(INTERNAL_ERROR, "Unable to find root node of XML document from '%s'!", url);
         return INTERNAL_ERROR;
     }
 
+    //Determine the format of by the first tag the feed document
     if(hasName(root, "feed")) {
         ret = parse_atom(root, feed_doc);
     }
@@ -289,13 +327,13 @@ void print_feed_doc(feed_doc_t *feed_doc, settings_t *settings) {
         printf("%s\n", feed->title);
 
         if(feed->auth_name && settings->author_flag) {
-            printf("%s\n", feed->auth_name);
+            printf("Author: %s\n", feed->auth_name);
         }
         if(feed->url && settings->asoc_url_flag) {
-            printf("%s\n", feed->url);
+            printf("URL: %s\n", feed->url);
         }
         if(feed->updated && settings->time_flag) {
-            printf("%s\n", feed->updated);
+            printf("Updated: %s\n", feed->updated);
         }
 
         if(settings->author_flag || 

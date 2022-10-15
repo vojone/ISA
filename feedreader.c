@@ -3,7 +3,7 @@
  * @brief Source file with main function of feedreader program
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 6. 10. 2022
+ * @date 15. 10. 2022
  */
 
 #include "feedreader.h"
@@ -33,6 +33,14 @@ int validate_settings(settings_t *settings) {
 }
 
 
+/**
+ * @brief Moves string buffer (with URL) to linked list as new element
+ * 
+ * @param buffer Buffer its value should be copied to the element of list
+ * @param dst_list Target list
+ * @return int SUCCESS if moving went OK
+ * @note buffer is erased
+ */
 int move_to_list(string_t *buffer, list_t *dst_list) {
     list_el_t *new_url = new_element(buffer->str);
     if(!new_url) {
@@ -49,6 +57,16 @@ int move_to_list(string_t *buffer, list_t *dst_list) {
 }
 
 
+/**
+ * @brief Processes character from the feedfile to create the list with URLs
+ * 
+ * @param c Character to be processed
+ * @param buff Buffer with URL
+ * @param list URL list
+ * @param len Ptr to the length of string in the buffer
+ * @param is_cmnt Comment flag (line is ignored if there is '#' as first non-whitepsace character)
+ * @return int SUCESS if processing went OK
+ */
 int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
     int ret;
 
@@ -56,22 +74,23 @@ int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
         *is_cmnt = false;
     }
 
-    if(*len > 0 && c == '\n') {
+    if(*len > 0 && c == '\n') { //< If there is newline and buffer is not empty -> move URL to the list
         if((ret = move_to_list(buff, list)) != SUCCESS) {
+            printerr(INTERNAL_ERROR, "Unable to move URL to the list!");
             return INTERNAL_ERROR;
         }
         
         *len = 0;
     }
-    else if((*len == 0 && c == '\n') || isspace(c) || *is_cmnt) {
+    else if((*len == 0 && c == '\n') || isspace(c) || *is_cmnt) { //< Characters to be ignored
         return SUCCESS;
     }
-    else if(c == '#' && *len == 0) {
+    else if(c == '#' && *len == 0) { //< Comment was found
         *is_cmnt = true;
     }
-    else {
+    else { //< Regular character
         if(!(buff = app_char(&buff, c))) {
-            printerr(INTERNAL_ERROR, "");
+            printerr(INTERNAL_ERROR, "Unable to append char to the string while parsing feedfile!");
             return INTERNAL_ERROR;
         }
 
@@ -82,6 +101,13 @@ int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
 }
 
 
+/**
+ * @brief Parses feedfile (text file with URL) and creates URL list from it
+ * 
+ * @param path Path to the feedfile
+ * @param url_list Output structure with URLs from feedfile 
+ * @return int SUCCESS if everything was OK
+ */
 int parse_feedfile(char *path, list_t *url_list) {
     FILE *file_ptr = fopen(path, "r");
     if(!file_ptr) {
@@ -89,7 +115,7 @@ int parse_feedfile(char *path, list_t *url_list) {
         return FILE_ERROR;
     }
 
-    string_t *buffer = new_string(INIT_STRING_SIZE);
+    string_t *buffer = new_string(INIT_STRING_SIZE); //< Buffer for the file content
     if(!buffer) {
         printerr(INTERNAL_ERROR, "Unable to allocate buffer for parsing feedfile!");
         fclose(file_ptr);
@@ -98,14 +124,14 @@ int parse_feedfile(char *path, list_t *url_list) {
 
     int ret, c, len = 0;
     bool is_cmnt = false;
-    while((c = fgetc(file_ptr)) != EOF) {
+    while((c = fgetc(file_ptr)) != EOF) { //< PArse file char by char
         if((ret = proc_char(c, buffer, url_list, &len, &is_cmnt)) != SUCCESS) {
             fclose(file_ptr);
             return ret;
         }
     }
 
-    if(len > 0) {
+    if(len > 0) { //< There is EOF without LF before (it shouldn't cause it is abnormal in UNIX text files)
         if((ret = move_to_list(buffer, url_list)) != SUCCESS) {
             fclose(file_ptr);
             return ret;
@@ -129,6 +155,14 @@ int parse_feedfile(char *path, list_t *url_list) {
 }
 
 
+/**
+ * @brief Parses and prints feed from specific URL
+ * 
+ * @param feed Pointer to feed to be parsed
+ * @param settings 
+ * @param url Source URL
+ * @return int SUCCESS if everything went OK
+ */
 int parse_and_print(char *feed, settings_t *settings, char *url) {
     int ret;
     feed_doc_t feed_doc;
@@ -141,6 +175,10 @@ int parse_and_print(char *feed, settings_t *settings, char *url) {
     }
 
     print_feed_doc(&feed_doc, settings);
+    
+    if(settings->feedfile) {
+        printf("\n");
+    }
 
     feed_doc_dtor(&feed_doc);
 
@@ -148,6 +186,14 @@ int parse_and_print(char *feed, settings_t *settings, char *url) {
 }
 
 
+/**
+ * @brief Performs the general functionality of the program - parsing and 
+ * printing formatted feed from all specified source
+ * 
+ * @param url_list List with URLs to feed documents 
+ * @param settings Settings of the program
+ * @return int SUCCESS if everything went OK
+ */
 int do_feedread(list_t *url_list, settings_t *settings) {
     list_el_t *current = url_list->header;
     int ret = SUCCESS;
@@ -192,7 +238,10 @@ int do_feedread(list_t *url_list, settings_t *settings) {
 
         ret = check_http_resp(&parsed_resp, current, url);
         if(ret == SUCCESS) {
-            parse_and_print(parsed_resp.msg, settings, url);
+            ret = parse_and_print(parsed_resp.msg, settings, url);
+            if(ret != SUCCESS) {
+                break;
+            }
         }
         else if(ret == HTTP_REDIRECT) { //< HTTP redirect was detected
             //Pass
@@ -220,13 +269,22 @@ int do_feedread(list_t *url_list, settings_t *settings) {
 }
 
 
+/**
+ * @brief Creates linked list with URLs (it can be one element list or
+ * llinked list with multiple element in case of using feedfile -
+ * feedfile has higher precedence than single URL)
+ * 
+ * @param url_list Output structure with URLs
+ * @param settings Settings of the program
+ * @return int SUCCESS if everything went ok
+ */
 int create_url_list(list_t *url_list, settings_t *settings) {
     int ret_code = SUCCESS;
 
-    if(settings->feedfile) {
+    if(settings->feedfile) { //< Feed file was specified so sandalone URL in argument is ignored
         ret_code = parse_feedfile(settings->feedfile, url_list);
     }
-    else if(settings->url) {
+    else if(settings->url) { //< Put URL from argument to the liast as one element
         list_el_t *first = new_element(settings->url);
         if(!first) {
             printerr(INTERNAL_ERROR, "Unable to allocate new element for url list!");
@@ -242,6 +300,9 @@ int create_url_list(list_t *url_list, settings_t *settings) {
 }
 
 
+/**
+ * @brief Main function of the program feedreader 
+ */
 int main(int argc, char **argv) {
     int ret_code = SUCCESS;
 
