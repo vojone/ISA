@@ -6,42 +6,24 @@
  * @date 6. 10. 2022
  */
 
-#ifndef _FEEDREADER_UTILS_
-#define _FEEDREADER_UTILS_
+#ifndef _FEEDREADER_COMMON_
+#define _FEEDREADER_COMMON_
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdarg.h>
 #include <regex.h>
 #include <stdbool.h>
 #include <ctype.h>
 
 #include <sys/types.h>
 
-
-#define PROGNAME "feedreader"
+#include "cli.h"
 
 #define INIT_STRING_SIZE 32 //< Default initial size of strings (that are used as buffer)
 #define INIT_NET_BUFF_SIZE 16384 //< Must be big enough for request (at least strlen(req_pattern) + strlen(host) + strlen(path) + strlen("\0"))
 
 #define DEBUG
-
-
-enum err_codes {
-    SUCCESS,
-    USAGE_ERROR,
-    FILE_ERROR,
-    URL_ERROR,
-    CONNECTION_ERROR,
-    COMMUNICATION_ERROR,
-    PATH_ERROR,
-    VERIFICATION_ERROR,
-    HTTP_ERROR,
-    FEED_ERROR,
-    INTERNAL_ERROR,
-};
-
 
 #define HTTP_REDIRECT -1
 #define MAX_REDIR_NUM 5
@@ -71,94 +53,16 @@ typedef struct list {
     list_el_t *header;
 } list_t;
 
-enum re_h_url_indexes {
-    SCHEME_PART, //< (http|https)://
-    USER_INFO_PART, //< see RFC3986 - userinfo part in http(s) is deprecated due to RFC9110)
-    HOST, //< IP-literal / IPv4address / reg-name
-    //IPVFUTURE, //< Just to tell user, that this format is not supported
-    PORT_PART, //< : *DIGIT
-    PATH, //< *( "/" segment )
-    QUERY, //< ? *( pchar / "/" / "?" )
-    FRAG_PART, //< # *( pchar / "/" / "?" )
-    RE_H_URL_NUM, //< Maximum amount of tokens in URL 
-};
-
-
-typedef struct h_url {
-    string_t *h_url_parts[RE_H_URL_NUM];
-} h_url_t;
-
-
-enum re_h_resp_indexes {
-    H_PART,
-    LINE,
-    VER,
-    STAT,
-    PHR,
-    LOC,
-    CON_TYPE,
-    RE_H_RESP_NUM, //< Maximum amount of tokens in URL 
-};
-
-
-typedef struct h_resp {
-    string_slice_t version;
-    string_slice_t status;
-    string_slice_t phrase;
-    string_slice_t location;
-    string_slice_t content_type;
-    char *msg;
-}   h_resp_t;
-
-
-//http-URI = "http" "://" authority path-abempty [ "?" query ] ("#" [fragment]) (see RFC9110)
-
-//Based on RFC3986
-#define HEXDIG "[0-9a-f]"
-#define H16 HEXDIG "{1,4}"
-#define LS32 "(" H16 ":" H16 ")|" IPV4ADDRESS
-
-#define UNRESERVED "[a-z0-9\\._~\\-]"
-#define SUBDELIMS "[@!\\$&'()*+,;=]"
-#define PCTENCODED "%" HEXDIG HEXDIG
-#define DECOCTED "[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-5]{2}"
-#define IPV4ADDRESS DECOCTED "\\." DECOCTED "\\." DECOCTED "\\." DECOCTED
-#define IPV6ADDRESS "(((" H16 ":){6}" LS32 ")|"\
-"(::(" H16 ":){5}" LS32 ")|"\
-"((" H16 ")?::(" H16 ":){4}" LS32 ")|"\
-"(((" H16 ":){,1}" H16 ")?::(" H16 ":){3}" LS32 ")|"\
-"(((" H16 ":){,2}" H16 ")?::(" H16 ":){2}" LS32 ")|"\
-"(((" H16 ":){,3}" H16 ")?::(" H16 ":)" LS32 ")|"\
-"(((" H16 ":){,4}" H16 ")?::" LS32 ")|"\
-"(((" H16 ":){,5}" H16 ")?::" H16 ")|"\
-"(((" H16 ":){,6}" H16 ")?::))"
-#define REGNAME "((" UNRESERVED ")|(" SUBDELIMS ")|(" PCTENCODED "))+"
-//End of part base od RFC3986
-
 
 #define ABS(x) (unsigned int)((x > 0) ? x : -x)
 
-/**
- * @brief Prints formated error message to the output
- * 
- * @param err_code 
- * @param message 
- */
-void printerr(int err_code, const char *message,...);
+bool is_empty(string_t *string);
 
-void printw(const char *message,...);
+char *skip_w_spaces(char *str);
 
-void init_h_url(h_url_t *h_url);
+string_slice_t new_str_slice(char *ptr, size_t len);
 
-void h_url_dtor(h_url_t *h_url);
-
-void erase_h_url(h_url_t *h_url);
-
-void init_h_resp(h_resp_t *h_resp);
-
-int parse_h_url(char *url, h_url_t *parsed_url, char* default_scheme_str);
-
-int parse_http_resp(h_resp_t *parsed_resp, string_t *response, char *url);
+bool is_line_empty(char *line_start_ptr);
 
 list_el_t *new_element(char *str_content, size_t indir_level);
 

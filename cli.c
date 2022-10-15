@@ -25,6 +25,46 @@ void init_settings(settings_t *settings) {
 }
 
 
+void printerr(int err_code, const char *message_format,...) {
+    char *err_str[] = {
+        "Success",
+        "Usage error",
+        "Error while opening file",
+        "Invalid URL",
+        "Connection error",
+        "Communication error",
+        "Path error",
+        "Verification error",
+        "HTTP error",
+        "Feed source error",
+        "Internal error",
+    };
+
+    fprintf(stderr, "%s: %s: ", PROGNAME, err_str[err_code]);
+
+    if(message_format) {
+        va_list args;
+        va_start (args, message_format);
+        vfprintf(stderr, message_format, args);
+    }
+
+    fprintf(stderr, "\n");
+}
+
+
+void printw(const char *message_format,...) {
+    fprintf(stderr, "%s: Warning: ", PROGNAME);
+
+    if(message_format) {
+        va_list args;
+        va_start(args, message_format);
+        vfprintf(stderr, message_format, args);
+    }
+
+    fprintf(stderr, "\n");
+}
+
+
 void print_usage() {
     const char *usage_msg = 
         "USAGE: ./feedreader <URL|-f <feedfile>> [options]\n";
@@ -100,7 +140,7 @@ int rec_lopt(char *cur_opt, int *char_i, opt_t *opt, settings_t *s) {
     opt->flag = NULL;
     opt->arg = NULL;
 
-    char *opt_str = shift(cur_opt, strlen("--"));
+    char *opt_str = &(cur_opt[strlen("--")]);
 
     // All long options of the program
     if(!strcmp(opt_str, "help")) {
