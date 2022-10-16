@@ -8,8 +8,6 @@
 
 #include "feedreader.h"
 
-#define DEBUG
-
 
 /**
  * @brief Checks if given configuration of settings is valid and eventually prints error msg

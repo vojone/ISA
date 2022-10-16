@@ -24,6 +24,8 @@
 #define RSS_VERSION "2.0" //< Supported version of RSS format
 
 
+#define FORMAT_STRICT
+
 
 /**
  * @brief Structure holding all important information about specific feed entry 

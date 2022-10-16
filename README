@@ -14,8 +14,6 @@ Reader of news in Atom/RSS2.0 format with TLS support.
 
 ## TODO
 
-Check of MIME
-
 HTTP1.1
 
 Tests

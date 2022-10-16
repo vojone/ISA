@@ -20,8 +20,6 @@
 
 #include "cli.h"
 
-#define DEBUG
-
 #define INIT_STRING_SIZE 32 //< Default initial size of strings (that are used as buffer)
 #define INIT_NET_BUFF_SIZE 16384 //< Must be big enough for request (at least strlen(req_pattern) + strlen(host) + strlen(path) + strlen("\0"))
 

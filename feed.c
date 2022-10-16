@@ -92,55 +92,97 @@ bool hasName(xmlNodePtr node, const char *name) {
 
 
 /**
+ * @brief Safely sets field of feed structure, if there is any value
+ * already it is freed
+ * 
+ * @param field Ptr to the field to be set
+ * @param new_content Ptr to the new content of the field
+ * @param tag Tagname of original tag, from which it content comes from 
+ * @return int SUCCESS or FEED_ERROR if new_content is NULL
+ */
+int set_feed_field(xmlChar **field, xmlChar *new_content, const char *tag) {
+    if(!new_content) {
+        printerr(FEED_ERROR, "Unable to get content of the '%s' tag!", tag);
+        return FEED_ERROR;
+    }
+
+    if(*field) {
+        fprintf(stderr, "Field: %s %s\n", *field, new_content);
+        xmlFree(*field);
+        *field = NULL;
+    }
+
+    *field = new_content;
+
+    return SUCCESS;
+}
+
+
+int parse_atom_author(xmlNodePtr author, feed_el_t *cur_feed) {
+    int ret = SUCCESS;
+    
+    xmlNodePtr sub_child = author->children;
+
+    while(sub_child) {
+        xmlChar *sub_content = xmlNodeGetContent(sub_child);
+
+        if(hasName(sub_child, "name")) {
+            ret = set_feed_field(&(cur_feed->auth_name), sub_content, "name");
+        }
+        else {
+            if(sub_content) xmlFree(sub_content);
+        }
+        if(ret != SUCCESS) {
+            break;
+        }
+
+        sub_child = sub_child->next; //< Go to the next sibling
+    }
+
+    return ret;
+}
+
+
+/**
  * @brief Parses atom entry XML structure
  * 
  * @param cur_feed Current feed structure to be filled with data 
  * @param entry 'Root' node of entry
- * @return int SUCCESS of FEED_ERROR
+ * @return int SUCCESS or FEED_ERROR
  */
 int parse_atom_entry(feed_el_t *cur_feed, xmlNodePtr entry) {
-    xmlNodePtr child, sub_child;
+    int ret = SUCCESS;
+    xmlNodePtr child;
 
     child = entry->children;
 
     while(child) { //< Try to find given tags
+        xmlChar *content = xmlNodeGetContent(child); //< Get content of child (it can be NULL)
+
         if(hasName(child, "title")) {
-            if(!(cur_feed->title = xmlNodeGetContent(child))) {
-                printerr(FEED_ERROR, "Unable to get content of 'title' tag!");
-                return FEED_ERROR;
-            }
+            ret = set_feed_field(&(cur_feed->title), content, "title");
         }
         else if(hasName(child, "updated")) {
-            if(!(cur_feed->updated = xmlNodeGetContent(child))) {
-                printerr(FEED_ERROR, "Unable to get content of 'updated' tag!");
-                return FEED_ERROR;
-            }
+            ret = set_feed_field(&(cur_feed->updated), content, "updated");
         }
         else if(hasName(child, "link")) {
-            if(!(cur_feed->url = xmlGetProp(child, (const xmlChar *)"href"))) {
-                printerr(FEED_ERROR, "Unable to get content of 'link' tag!");
-                return FEED_ERROR;
-            }
+            ret = set_feed_field(&(cur_feed->url), content, "link");
         }
         else if(hasName(child, "author")) { //< Go inside author tag (there can be name and email)
-            sub_child = child->children;
-
-            while(sub_child) {
-                if(hasName(sub_child, "name")) {
-                    if(!(cur_feed->auth_name = xmlNodeGetContent(sub_child))) {
-                        printerr(FEED_ERROR, "Unable to get ");
-                        return FEED_ERROR;
-                    }
-                }
-
-                sub_child = sub_child->next; //< Go to the next sibling
-            }
+            ret = parse_atom_author(child, cur_feed);
+            if(content) xmlFree(content);
+        }
+        else {
+            if(content) xmlFree(content);
+        }
+        if(ret != SUCCESS) {
+            break;
         }
 
         child = child->next; //< Go to the next sibling
     }
 
-    return SUCCESS;
+    return ret;
 }
 
 
@@ -152,16 +194,15 @@ int parse_atom_entry(feed_el_t *cur_feed, xmlNodePtr entry) {
  * @return int SUCCESS if everything went OK
  */
 int parse_atom(xmlNodePtr root, feed_doc_t *feed_doc) {
-    int ret;
+    int ret = SUCCESS;
     feed_el_t *cur_feed;
     xmlNodePtr root_child = root->children;
 
     while(root_child) { //< Perform search in root child
+        xmlChar *content = xmlNodeGetContent(root_child); //< Get content of child (it can be NULL)
+
         if(hasName(root_child, "title")) {
-            if(!(feed_doc->src_name = xmlNodeGetContent(root_child))) {
-                printerr(FEED_ERROR, "");
-                return FEED_ERROR;
-            }
+            ret = set_feed_field(&(feed_doc->src_name), content, "title");
         }
         else if(hasName(root_child, "entry")) { //< Entry was found
             if(!(cur_feed = new_feed(feed_doc))) {
@@ -170,15 +211,19 @@ int parse_atom(xmlNodePtr root, feed_doc_t *feed_doc) {
             }
             
             ret = parse_atom_entry(cur_feed, root_child); //< Parse it
-            if(ret != SUCCESS) {
-                return ret;
-            }
+            if(content) xmlFree(content);
         }
+        else {
+            if(content) xmlFree(content);
+        }
+        if(ret != SUCCESS) {
+            break;
+        }       
 
         root_child = root_child->next; //< Go to the next child of the root node
     }
 
-    return SUCCESS;
+    return ret;
 }
 
 
@@ -190,38 +235,35 @@ int parse_atom(xmlNodePtr root, feed_doc_t *feed_doc) {
  * @return int SUCCESS if everything went OK
  */
 int parse_rss_item(xmlNodePtr item, feed_el_t *cur_feed) {
+    int ret = SUCCESS;
     xmlNodePtr item_child = item->children;
 
     while(item_child) {
+        xmlChar *content = xmlNodeGetContent(item_child);
+
         if(hasName(item_child, "title")) {
-            if(!(cur_feed->title = xmlNodeGetContent(item_child))) {
-                printerr(FEED_ERROR, "Unable to get content of the 'title' tag!");
-                return FEED_ERROR;
-            }
+            ret = set_feed_field(&(cur_feed->title), content, "title");
         }
         else if(hasName(item_child, "link")) {
-            if(!(cur_feed->url = xmlNodeGetContent(item_child))) {
-                printerr(FEED_ERROR, "Unable to get content of the 'link' tag!");
-                return FEED_ERROR;
-            }
+            ret = set_feed_field(&(cur_feed->url), content, "link");
         }
         else if(hasName(item_child, "pubDate")) { //?
-            if(!(cur_feed->updated = xmlNodeGetContent(item_child))) {
-                printerr(FEED_ERROR, "Unable to get content of the 'pubDate' tag!");
-                return FEED_ERROR;
-            }
+            ret = set_feed_field(&(cur_feed->updated), content, "pubDate");
         }
         else if(hasName(item_child, "author")) { //?
-            if(!(cur_feed->auth_name = xmlNodeGetContent(item_child))) {
-                printerr(FEED_ERROR, "Unable to get content of the 'author' tag!");
-                return FEED_ERROR;
-            }
+            ret = set_feed_field(&(cur_feed->auth_name), content, "author");
+        }
+        else {
+            if(content) xmlFree(content);
+        }
+        if(ret != SUCCESS) {
+            break;
         }
         
         item_child = item_child->next; //< Go to the next sibling
     }
 
-    return SUCCESS;
+    return ret;
 }
 
 
@@ -233,7 +275,7 @@ int parse_rss_item(xmlNodePtr item, feed_el_t *cur_feed) {
  * @return int SUCCESS if everything went OK
  */
 int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
-    int ret;
+    int ret = SUCCESS;
     feed_el_t *cur_feed;
     xmlNodePtr channel = root->children, channel_child;  
 
@@ -257,22 +299,18 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
 
             while(channel_child) { //< Search all nodes inside channel tag
                 if(hasName(channel_child, "title")) {
-                    feed_doc->src_name = xmlNodeGetContent(channel_child);
-                    if(!feed_doc->src_name) {
-                        printerr(FEED_ERROR, "");
-                        return FEED_ERROR;
-                    }
+                    xmlChar *cntnt = xmlNodeGetContent(channel_child);
+                    ret = set_feed_field(&(feed_doc->src_name), cntnt, "title");
                 }
                 else if(hasName(channel_child, "item")) {
                     if(!(cur_feed = new_feed(feed_doc))) {
                         printerr(INTERNAL_ERROR, "Unable to allocate memory for feed structure!");
                         return INTERNAL_ERROR;
                     }
-
                     ret = parse_rss_item(channel_child, cur_feed);
-                    if(ret != SUCCESS) {
-                        return ret;
-                    }
+                }
+                if(ret != SUCCESS) {
+                    return ret;
                 }
 
                 channel_child = channel_child->next; //< Go to the next child of channel tag
@@ -298,8 +336,10 @@ int sel_parser(xmlNodePtr root, int exp_type, char *url, parse_f_ptr_t *func) {
         *func = parse_rss;
     }
     else {
-        printerr(FEED_ERROR, "Unexpected name of root element of XML from '%s'! Expected feed/rss", url);
-        return FEED_ERROR;
+        #ifdef FORMAT_STRICT
+            printerr(FEED_ERROR, "Unexpected name of root element of XML from '%s'! Expected feed/rss", url);
+            return FEED_ERROR;
+        #endif
     }
 
     if(real_mime != exp_type && exp_type != XML) { //< The it seems that mime type of document is wrong
@@ -313,7 +353,13 @@ int sel_parser(xmlNodePtr root, int exp_type, char *url, parse_f_ptr_t *func) {
 int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url) {
     int ret;
 
-    xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, 0); //< PArse document by libxml2
+    int xml_p_flags = XML_PARSE_HUGE | XML_PARSE_RECOVER | XML_PARSE_RECOVER;
+
+    #ifndef DEBUG
+        xml_p_flags |= XML_PARSE_NOERROR | XML_PARSE_NOWARNING;
+    #endif
+
+    xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, xml_p_flags); //< PArse document by libxml2
     if(!xml) {
         printerr(INTERNAL_ERROR, "Unable to parse XML document from '%s'!", url);
         return INTERNAL_ERROR;
@@ -343,7 +389,9 @@ void print_feed_doc(feed_doc_t *feed_doc, settings_t *settings) {
 
     feed_el_t *feed = feed_doc->feed;
     while(feed) {
-        printf("%s\n", feed->title);
+        if(feed->title) {
+            printf("%s\n", feed->title);
+        }
 
         if(feed->auth_name && settings->author_flag) {
             printf("Author: %s\n", feed->auth_name);
