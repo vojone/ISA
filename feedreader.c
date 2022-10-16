@@ -185,88 +185,111 @@ int parse_and_print(char *feed, int exp_type, settings_t *settings, char *url) {
 }
 
 
+int load_data(h_url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
+    if(!strcmp("https://", p_url->h_url_parts[SCHEME_PART]->str)) {
+        return https_connect(p_url, data_buff, url, s);
+    }
+    else {
+        return http_connect(p_url, data_buff, url);
+    }
+}
+
+
+int parse_data(int *exp_type, char** doc_start, h_url_t *parsed_url, 
+                list_el_t *current, string_t *data_buff,  char *url) {
+    int ret = SUCCESS;
+
+    char *scheme = parsed_url->h_url_parts[SCHEME_PART]->str;
+    if(!strcmp(scheme, "https://") || !strcmp(scheme, "http://")) {
+        h_resp_t parsed_resp;
+        init_h_resp(&parsed_resp);
+
+        erase_h_resp(&parsed_resp);
+        ret = parse_http_resp(&parsed_resp, data_buff, url);
+        if(ret != SUCCESS) {
+            return ret;
+        }
+
+        ret = check_http_resp(&parsed_resp, current, url);
+        if(ret != SUCCESS) {
+            return ret;
+        }
+
+        *exp_type = parsed_resp.doc_type;
+        *doc_start = parsed_resp.msg;
+
+        #ifdef DEBUG
+            fprintf(stderr, "HTTP hdr position:\n");
+            fprintf(stderr, "Version: %ld %ld\n", parsed_resp.version.st - data_buff->str, parsed_resp.version.len);
+            fprintf(stderr, "Status: %ld %ld\n", parsed_resp.status.st - data_buff->str, parsed_resp.status.len);
+            fprintf(stderr, "Phrase: %ld %ld\n", parsed_resp.phrase.st - data_buff->str, parsed_resp.phrase.len);
+            fprintf(stderr, "Location: %ld %ld\n", parsed_resp.location.st - data_buff->str, parsed_resp.location.len);
+            fprintf(stderr, "Content-Type: %ld %ld\n", parsed_resp.content_type.st - data_buff->str, parsed_resp.content_type.len);
+            //fprintf(stderr, "Msg: %s\n", parsed_resp.msg);
+        #endif
+    }
+    else {
+        printerr(URL_ERROR, "Unknown scheme!");
+        return URL_ERROR;
+    }
+
+    return ret;
+}
+
+
 /**
  * @brief Performs the general functionality of the program - parsing and 
  * printing formatted feed from all specified source
  * 
  * @param url_list List with URLs to feed documents 
  * @param settings Settings of the program
- * @return int SUCCESS if everything went OK
+ * @return int SUCCESS if everything went OK, otherwise INTERNAL ERROR
+ * @note If problem occurs while parsing URL or XML from source, result field
+ * in related list_el_t is modified, but processing of other URLs continues
  */
 int do_feedread(list_t *url_list, settings_t *settings) {
     list_el_t *current = url_list->header;
-    int ret = SUCCESS;
 
     h_url_t parsed_url;
     init_h_url(&parsed_url);
 
-    h_resp_t parsed_resp;
-    init_h_resp(&parsed_resp);
-
-    string_t *resp_buff = new_string(INIT_NET_BUFF_SIZE);
-    if(!resp_buff) {
+    string_t *data_buff = new_string(INIT_NET_BUFF_SIZE);
+    if(!data_buff) {
         printerr(INTERNAL_ERROR, "Unable to allocate buffer for responses!");
         return INTERNAL_ERROR;
     }
 
     openssl_init();
-    while(current) {
+
+    for(; current; current = current->next) { //< Parse URL, load document and parse it for every URL in linked list
+        int *ret = &(current->result);
         char *url = current->string->str;
 
         erase_h_url(&parsed_url);
-        if((ret = parse_h_url(url, &parsed_url, "https://")) != SUCCESS) {
-            string_dtor(resp_buff);
-            h_url_dtor(&parsed_url);
-            return ret;
+        if((*ret = parse_h_url(url, &parsed_url, "https://")) != SUCCESS) { //< Parsing of URL (with default scheme 'https://')
+            continue;
         }
 
-        if(!strcmp("https://", parsed_url.h_url_parts[SCHEME_PART]->str)) {
-            ret = https_connect(&parsed_url, resp_buff, url, settings);
-        }
-        else {
-            ret = http_connect(&parsed_url, resp_buff, url);
-        }
-        if(ret != SUCCESS) {
-            break;
+        *ret = load_data(&parsed_url, data_buff, url, settings); //< Loading data (XML doc)
+        if(*ret != SUCCESS) {
+            continue;
         }
 
-        erase_h_resp(&parsed_resp);
-        ret = parse_http_resp(&parsed_resp, resp_buff, url);
-        if(ret != SUCCESS) {
-            break;
+        char *doc_start;
+        int exp_type;
+
+        *ret = parse_data(&exp_type, &doc_start, &parsed_url, current, data_buff, url);
+        if(*ret != SUCCESS) {
+            continue;
         }
 
-        ret = check_http_resp(&parsed_resp, current, url);
-        if(ret == SUCCESS) {
-            int exp_type = parsed_resp.mime_type;
-            ret = parse_and_print(parsed_resp.msg, exp_type, settings, url);
-            if(ret != SUCCESS) {
-                break;
-            }
-        }
-        else if(ret == HTTP_REDIRECT) { //< HTTP redirect was detected
-            //Pass
-        }
-        else {  //< Error occured
-            break; 
-        }
-
-        #ifdef DEBUG
-            fprintf(stderr, "V: %ld %ld\n", parsed_resp.version.st - resp_buff->str, parsed_resp.version.len);
-            fprintf(stderr, "Status: %ld %ld\n", parsed_resp.status.st - resp_buff->str, parsed_resp.status.len);
-            fprintf(stderr, "Phrase: %ld %ld\n", parsed_resp.phrase.st - resp_buff->str, parsed_resp.phrase.len);
-            fprintf(stderr, "Loc: %ld %ld\n", parsed_resp.location.st - resp_buff->str, parsed_resp.location.len);
-            fprintf(stderr, "CType: %ld %ld\n", parsed_resp.content_type.st - resp_buff->str, parsed_resp.content_type.len);
-            //fprintf(stderr, "Msg: %s\n", parsed_resp.msg);
-        #endif
-
-        current = current->next;
+        *ret = parse_and_print(doc_start, exp_type, settings, url);
     }
 
-    string_dtor(resp_buff);
+    string_dtor(data_buff);
     h_url_dtor(&parsed_url);
 
-    return ret;
+    return SUCCESS;
 }
 
 
@@ -295,6 +318,23 @@ int create_url_list(list_t *url_list, settings_t *settings) {
             first->indirect_lvl = 0; //< It is original URL
             list_append(url_list, first);
         }
+    }
+
+    return ret_code;
+}
+
+
+int get_return_code(list_t *url_list) {
+    int ret_code = SUCCESS;
+    list_el_t *url = url_list->header;
+
+    while(url) {
+        if(url->result != SUCCESS) {
+            url->result = ret_code;
+            break;
+        }
+
+        url = url->next;
     }
 
     return ret_code;
@@ -335,6 +375,11 @@ int main(int argc, char **argv) {
     ret_code = do_feedread(&url_list, &settings);
     xml_parser_cleanup();
 
+    if(ret_code == SUCCESS) {
+        ret_code = get_return_code(&url_list);
+    }
+
     list_dtor(&url_list);
+
     return ret_code;
 }

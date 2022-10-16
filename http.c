@@ -135,7 +135,7 @@ int https_connect(h_url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
     BIO *bio = BIO_new_ssl_connect(ctx);
     BIO_get_ssl(bio, &ssl);
     if(!ssl) {
-        printerr(INTERNAL_ERROR, "Unable to allocate SSL ptr!");
+        printerr(INTERNAL_ERROR, "Unable to allocate SSL!");
         SSL_CTX_free(ctx);
         return INTERNAL_ERROR;
     }
@@ -305,7 +305,7 @@ int find_mime(h_resp_t *p_resp, char *url) {
     for(int i = 0; i < MIME_NUM; i++) {
         int res = regexec(&(re[i]), con_type_str, 1, &(match[i]), 0);
         if(res == 0) {
-            p_resp->mime_type = i; //< Set mime type
+            p_resp->doc_type = i; //< Set mime type
             ret = SUCCESS;
             break;
         }

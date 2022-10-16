@@ -110,7 +110,7 @@ enum re_h_resp_indexes {
 typedef struct h_resp {
     string_slice_t version, status, phrase;
     string_slice_t location, content_type, content_len;
-    mime_type_t mime_type;
+    doc_type_t doc_type;
     char *msg; //< Ptr to the start of the response message
 } h_resp_t;
 

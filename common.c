@@ -80,6 +80,7 @@ list_el_t *new_element(char *str_content) {
 
     //Initialization
     new->indirect_lvl = 0;
+    new->result = SUCCESS;
     new->next = NULL;
 
     return new;

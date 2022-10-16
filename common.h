@@ -29,12 +29,12 @@
  * @brief Enum of supported MIME types
  *  
  */
-typedef enum mime_type {
+typedef enum doc_type {
     RSS,
     ATOM,
     XML,
     MIME_NUM,
-} mime_type_t;
+} doc_type_t;
 
 /**
  * @brief String structure (emulates string data type from high lvl languages)
@@ -64,6 +64,7 @@ typedef struct string_slice {
 typedef struct list_el {
     string_t *string; //< String structure with content (URL)
     int indirect_lvl; //< Indirection level (for recognizing redirection URL)
+    int result;
     struct list_el *next; //< Pointer to next element in the linked list
 } list_el_t;
 
