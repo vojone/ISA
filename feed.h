@@ -23,6 +23,8 @@
 
 #define RSS_VERSION "2.0" //< Supported version of RSS format
 
+
+
 /**
  * @brief Structure holding all important information about specific feed entry 
  * 
@@ -41,6 +43,9 @@ typedef struct feed_doc {
     xmlChar *src_name; //< Name of the feed doc
     feed_el_t *feed; //< Ptr to the first feed entry
 } feed_doc_t;
+
+
+typedef int(* parse_f_ptr_t)(xmlNodePtr, feed_doc_t *); //< Pointer to the parsing function (depends of format)
 
 
 /**
@@ -107,11 +112,12 @@ void feed_doc_dtor(feed_doc_t *feed_doc);
  * @brief Parses XML document with feed, the format is determined by the root tag
  * 
  * @param feed_doc Feed document structure to be filled by the data from parsed document
+ * @param exp_type Code of expected format of the feed document
  * @param feed Pointer to buffer with document that should be parsed
  * @param url Source URL of XML document
  * @return int SUCCESS if parsing went OK
  */
-int parse_feed_doc(feed_doc_t *feed_doc, char *feed, char *url);
+int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url);
 
 
 /**

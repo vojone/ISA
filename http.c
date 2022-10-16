@@ -163,8 +163,6 @@ int https_connect(h_url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
         free_https_connection(bio, ctx);
         return VERIFICATION_ERROR;
     }
-
-    //TODO get peer certificate
     
     if((ret = send_request(bio, p_url, url)) != SUCCESS) { //< Send request to the server
         free_https_connection(bio, ctx);
@@ -261,6 +259,70 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
 }
 
 
+void free_all_patterns(regex_t *regexes, int r_num) {
+    for(int i = 0; i < r_num; i++) {
+        regfree(&(regexes[i]));
+    }
+}
+
+
+int prepare_mime_patterns(regex_t *regexes) {
+    char *patterns[MIME_NUM] = {
+        "^" RSS_MIME, 
+        "^" ATOM_MIME, 
+        "^" XML_MIME,
+    };
+
+    for(int i = 0; i < MIME_NUM; i++) {
+        if(regcomp(&(regexes[i]), patterns[i], REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
+            printerr(INTERNAL_ERROR, "Invalid compilation of MIME regexes! %d", i);
+            return INTERNAL_ERROR;
+        }
+    }
+
+    return SUCCESS;
+}
+
+
+int find_mime(h_resp_t *p_resp, char *url) {
+    regex_t re[MIME_NUM];
+    regmatch_t match[MIME_NUM];
+
+    int ret;
+
+    if((ret = prepare_mime_patterns(re)) != SUCCESS) {
+        return ret;
+    }
+
+    string_t *content_type = slice_to_string(&(p_resp->content_type));
+    if(!content_type) {
+        printerr(INTERNAL_ERROR, "Unable to allocate temporary buffer for MIME type!");
+        return INTERNAL_ERROR;
+    }
+
+    ret = HTTP_ERROR;
+    char *con_type_str = content_type->str;
+    for(int i = 0; i < MIME_NUM; i++) {
+        int res = regexec(&(re[i]), con_type_str, 1, &(match[i]), 0);
+        if(res == 0) {
+            p_resp->mime_type = i; //< Set mime type
+            ret = SUCCESS;
+            break;
+        }
+    }
+
+    if(ret != SUCCESS) {
+        printerr(HTTP_ERROR, "MIME type '%s' of document from '%s' is not supported!", content_type->str, url);
+    }
+
+    free_all_patterns(re, MIME_NUM);
+    string_dtor(content_type);
+
+    return ret;
+}
+
+
+
 int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
     string_t *status = slice_to_string(&(p_resp->status));
     if(!status) {
@@ -287,15 +349,16 @@ int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
             return HTTP_REDIRECT;
         }
     }
+    else if(ret == SUCCESS) {
+
+        #ifdef CHECK_MIME_TYPE
+            if(p_resp->content_type.st) {
+                ret = find_mime(p_resp, url);
+            }
+        #endif
+    }
 
     return ret;
-}
-
-
-void free_all_patterns(regex_t *regexes, int r_num) {
-    for(int i = 0; i < r_num; i++) {
-        regfree(&(regexes[i]));
-    }
 }
 
 
@@ -334,10 +397,15 @@ void init_h_resp(h_resp_t *h_resp) {
 }
 
 
+void erase_h_resp(h_resp_t *h_resp) {
+    init_h_resp(h_resp);
+}
+
+
 int prepare_url_patterns(regex_t *regexes) {
     //Patterns are based on RFC3986
     //http-URI = "http" "://" authority path-abempty [ "?" query ] ("#" [fragment]) (see RFC9110)
-    char *patterns[] = {
+    char *patterns[RE_H_URL_NUM] = {
         "^(http|https)://",
         "(" UNRESERVED "|" SUBDELIMS "|:|(" PCTENCODED "))+@",
         "(" IPV4ADDRESS ")|(\\[" IPV6ADDRESS "\\])|(" REGNAME ")",
@@ -503,7 +571,7 @@ int parse_h_url(char *url, h_url_t *p_url, char* def_scheme_part_str) {
 
 
 int prepare_resp_patterns(regex_t *regexes) {
-    char *patterns[] = { //< There is always ^ because we always match pattern from start of the string 
+    char *patterns[RE_H_RESP_NUM] = { //< There is always ^ because we always match pattern from start of the string 
         "^(.|\r\n)*\r\n\r\n",
         "^.*\r\n",
         "^[^ \t]*",
@@ -511,6 +579,7 @@ int prepare_resp_patterns(regex_t *regexes) {
         "^[^\r\n]*",
         "^Location:",
         "^Content-Type:",
+        "^Content-Length:"
     };
 
     for(int i = 0; i < RE_H_RESP_NUM; i++) {
@@ -551,6 +620,14 @@ void parse_hdrs(char *line_end, resp_parse_ctx_t *ctx, h_resp_t *p_resp) {
         *cursor =  skip_w_spaces(&((*cursor)[matches[CON_TYPE].rm_eo]));
         size_t len = (size_t)(line_end - *cursor);
         p_resp->content_type = new_str_slice(*cursor, len - strlen("\r\n"));
+    }
+
+    regex_t *con_len_r = &(regexes[CON_LEN]);
+    res[CON_LEN] = regexec(con_len_r, *cursor, 1, &(matches[CON_LEN]), 0);
+    if(res[CON_LEN] != REG_NOMATCH) {
+        *cursor =  skip_w_spaces(&((*cursor)[matches[CON_LEN].rm_eo]));
+        size_t len = (size_t)(line_end - *cursor);
+        p_resp->content_len = new_str_slice(*cursor, len - strlen("\r\n"));
     }
 }
 

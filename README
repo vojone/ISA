@@ -12,3 +12,10 @@ Reader of news in Atom/RSS2.0 format with TLS support.
 
 ## Extensions & Limitations
 
+## TODO
+
+Check of MIME
+
+HTTP1.1
+
+Tests

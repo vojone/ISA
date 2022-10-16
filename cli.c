@@ -44,15 +44,15 @@ void printerr(int err_code, const char *message_format,...) {
 void printw(const char *message_format,...) {
     #ifdef CLI_WARNINGS
     
-    fprintf(stderr, "%s: Warning: ", PROGNAME);
+        fprintf(stderr, "%s: Warning: ", PROGNAME);
 
-    if(message_format) {
-        va_list args;
-        va_start(args, message_format);
-        vfprintf(stderr, message_format, args);
-    }
+        if(message_format) {
+            va_list args;
+            va_start(args, message_format);
+            vfprintf(stderr, message_format, args);
+        }
 
-    fprintf(stderr, "\n");
+        fprintf(stderr, "\n");
 
     #endif
 }

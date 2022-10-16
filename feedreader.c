@@ -159,16 +159,17 @@ int parse_feedfile(char *path, list_t *url_list) {
  * @brief Parses and prints feed from specific URL
  * 
  * @param feed Pointer to feed to be parsed
+ * @param exp_type Expected MIME type of the document
  * @param settings 
  * @param url Source URL
  * @return int SUCCESS if everything went OK
  */
-int parse_and_print(char *feed, settings_t *settings, char *url) {
+int parse_and_print(char *feed, int exp_type, settings_t *settings, char *url) {
     int ret;
     feed_doc_t feed_doc;
     init_feed_doc(&feed_doc);
 
-    ret = parse_feed_doc(&feed_doc, feed, url);
+    ret = parse_feed_doc(&feed_doc, exp_type, feed, url);
     if(ret != SUCCESS) {
         feed_doc_dtor(&feed_doc);
         return ret;
@@ -231,6 +232,7 @@ int do_feedread(list_t *url_list, settings_t *settings) {
             break;
         }
 
+        erase_h_resp(&parsed_resp);
         ret = parse_http_resp(&parsed_resp, resp_buff, url);
         if(ret != SUCCESS) {
             break;
@@ -238,7 +240,8 @@ int do_feedread(list_t *url_list, settings_t *settings) {
 
         ret = check_http_resp(&parsed_resp, current, url);
         if(ret == SUCCESS) {
-            ret = parse_and_print(parsed_resp.msg, settings, url);
+            int exp_type = parsed_resp.mime_type;
+            ret = parse_and_print(parsed_resp.msg, exp_type, settings, url);
             if(ret != SUCCESS) {
                 break;
             }

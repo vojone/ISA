@@ -232,7 +232,7 @@ string_t *set_stringn(string_t **dest, char *src, size_t n) {
 
     memset((*dest)->str, 0, (*dest)->size);
 
-    while((*dest)->size <= strlen(src)) {
+    while((*dest)->size <= n) {
         if(!(*dest = ext_string(*dest))) {
             return NULL;
         }

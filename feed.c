@@ -286,7 +286,31 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
 }
 
 
-int parse_feed_doc(feed_doc_t *feed_doc, char *feed, char *url) {
+int sel_parser(xmlNodePtr root, int exp_type, char *url, parse_f_ptr_t *func) {
+    int real_mime;
+
+    if(hasName(root, "feed")) {
+        real_mime = ATOM;
+        *func = parse_atom;
+    }
+    else if(hasName(root, "rss")) {
+        real_mime = RSS;
+        *func = parse_rss;
+    }
+    else {
+        printerr(FEED_ERROR, "Unexpected name of root element of XML from '%s'! Expected feed/rss", url);
+        return FEED_ERROR;
+    }
+
+    if(real_mime != exp_type && exp_type != XML) { //< The it seems that mime type of document is wrong
+        printw("The real format of feed document from '%s' does not match the MIME type of HTTP response!", url);
+    }
+
+    return SUCCESS;
+}
+
+
+int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url) {
     int ret;
 
     xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, 0); //< PArse document by libxml2
@@ -302,15 +326,10 @@ int parse_feed_doc(feed_doc_t *feed_doc, char *feed, char *url) {
     }
 
     //Determine the format of by the first tag the feed document
-    if(hasName(root, "feed")) {
-        ret = parse_atom(root, feed_doc);
-    }
-    else if(hasName(root, "rss")) {
-        ret = parse_rss(root, feed_doc);
-    }
-    else {
-        printerr(FEED_ERROR, "Unexpected name of root element of XML from '%s'! Expected feed/rss", url);
-        ret = FEED_ERROR;
+    parse_f_ptr_t parsing_function = NULL;
+    ret = sel_parser(root, exp_type, url, &parsing_function);
+    if(ret == SUCCESS) {
+        parsing_function(root, feed_doc);
     }
 
     xmlFreeDoc(xml);

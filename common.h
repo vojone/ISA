@@ -28,6 +28,17 @@
 #define ABS(x) (unsigned int)((x > 0) ? x : -x)
 
 /**
+ * @brief Enum of supported MIME types
+ *  
+ */
+typedef enum mime_type {
+    RSS,
+    ATOM,
+    XML,
+    MIME_NUM,
+} mime_type_t;
+
+/**
  * @brief String structure (emulates string data type from high lvl languages)
  * 
  */

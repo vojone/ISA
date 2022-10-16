@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <poll.h>
 #include <regex.h>
+#include <string.h>
 
 #include <sys/socket.h>
 
@@ -29,7 +30,8 @@
 #define MAX_REDIR_NUM 5 //< Maximum amount of redirections to prevent redirection cycle
 #define TIMEOUT_S 5 //< Maximum time in sec for waiting for the writing/reading from BIO socket
 
-#define HTTP_VERSION "HTTP/1.0" //< HTTP version
+#define HTTP_VERSION "HTTP/1.0" //< HTTP version (used in request)
+
 
 //Based on RFC3986
 #define HEXDIG "[0-9a-f]"
@@ -88,8 +90,17 @@ enum re_h_resp_indexes {
     PHR,
     LOC,
     CON_TYPE,
+    CON_LEN,
     RE_H_RESP_NUM, //< Maximum amount of tokens in URL 
 };
+
+
+#define CHECK_MIME_TYPE
+
+
+#define ATOM_MIME "application/atom\\+xml"
+#define RSS_MIME "application/rss\\+xml"
+#define XML_MIME "text/xml"
 
 
 /**
@@ -97,13 +108,11 @@ enum re_h_resp_indexes {
  * 
  */
 typedef struct h_resp {
-    string_slice_t version;
-    string_slice_t status;
-    string_slice_t phrase;
-    string_slice_t location;
-    string_slice_t content_type;
+    string_slice_t version, status, phrase;
+    string_slice_t location, content_type, content_len;
+    mime_type_t mime_type;
     char *msg; //< Ptr to the start of the response message
-}   h_resp_t;
+} h_resp_t;
 
 
 void openssl_init();
@@ -131,6 +140,8 @@ void h_url_dtor(h_url_t *h_url);
 void erase_h_url(h_url_t *h_url);
 
 void init_h_resp(h_resp_t *h_resp);
+
+void erase_h_resp(h_resp_t *h_resp);
 
 int parse_h_url(char *url, h_url_t *parsed_url, char* default_scheme_str);
 
