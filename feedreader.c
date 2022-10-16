@@ -195,28 +195,35 @@ int load_data(h_url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
 }
 
 
-int parse_data(int *exp_type, char** doc_start, h_url_t *parsed_url, 
-                list_el_t *current, string_t *data_buff,  char *url) {
+typedef struct data_ctx {
+    char* doc_start;
+    int exp_type;
+    h_url_t *parsed_url;
+    char *url;
+} data_ctx_t;
+
+
+int parse_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
     int ret = SUCCESS;
 
-    char *scheme = parsed_url->h_url_parts[SCHEME_PART]->str;
+    char *scheme = ctx->parsed_url->h_url_parts[SCHEME_PART]->str;
     if(!strcmp(scheme, "https://") || !strcmp(scheme, "http://")) {
         h_resp_t parsed_resp;
         init_h_resp(&parsed_resp);
 
         erase_h_resp(&parsed_resp);
-        ret = parse_http_resp(&parsed_resp, data_buff, url);
+        ret = parse_http_resp(&parsed_resp, data_buff, ctx->url);
         if(ret != SUCCESS) {
             return ret;
         }
 
-        ret = check_http_resp(&parsed_resp, current, url);
+        ret = check_http_resp(&parsed_resp, current, ctx->url);
         if(ret != SUCCESS) {
             return ret;
         }
 
-        *exp_type = parsed_resp.doc_type;
-        *doc_start = parsed_resp.msg;
+        ctx->exp_type = parsed_resp.doc_type;
+        ctx->doc_start = parsed_resp.msg;
 
         #ifdef DEBUG
             fprintf(stderr, "HTTP hdr position:\n");
@@ -275,15 +282,17 @@ int do_feedread(list_t *url_list, settings_t *settings) {
             continue;
         }
 
-        char *doc_start;
-        int exp_type;
-
-        *ret = parse_data(&exp_type, &doc_start, &parsed_url, current, data_buff, url);
-        if(*ret != SUCCESS) {
+        data_ctx_t ctx = { .url = url, .parsed_url = &parsed_url };
+        *ret = parse_data(&ctx, current, data_buff);
+        if(*ret == HTTP_REDIRECT) {
+            *ret = SUCCESS;
+            continue;
+        }
+        else if(*ret != SUCCESS) {
             continue;
         }
 
-        *ret = parse_and_print(doc_start, exp_type, settings, url);
+        *ret = parse_and_print(ctx.doc_start, ctx.exp_type, settings, url);
     }
 
     string_dtor(data_buff);
@@ -330,7 +339,7 @@ int get_return_code(list_t *url_list) {
 
     while(url) {
         if(url->result != SUCCESS) {
-            url->result = ret_code;
+            ret_code = url->result;
             break;
         }
 

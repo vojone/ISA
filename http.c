@@ -446,7 +446,7 @@ int res_url(bool is_inv, bool int_err, int *res, h_url_t *p_url, char *url) {
     }
 
     if(res[SCHEME_PART] == REG_NOMATCH) { //< Non-strict parsing
-        printw("Scheme part of URL '%s' was not found! It will be set to default!", url);
+        printw("Valid scheme part of URL '%s' was not found! It will be set to default!", url);
     }
 
     if(res[USER_INFO_PART] != REG_NOMATCH) {
