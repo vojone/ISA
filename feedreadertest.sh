@@ -18,7 +18,7 @@
 # If OUPUT_FILE_NAME or RET_CODE_FILE_NAME is missing, there is no comparison
 # of expected return code or output (depends on missing file)
 #
-# For preserving output file use -v option
+# For preserving output files (*.tmp) use -v option, otherwise thy are deleted
 
 PROGRAM_PATH="./feedreader"
 
@@ -28,8 +28,9 @@ TEST_FILE_NAME="test"
 OUTPUT_FILE_NAME="out"
 RET_CODE_FILE_NAME="ret"
 
-RESULT_FILE_NAME="out.tmp"
-ERROR_FILE_NAME="err.tmp"
+RESULT_FILE_NAME="out.tmp" # File with STDOUT that was produced by the program
+ERROR_FILE_NAME="err.tmp" # File with STDERR that was produced by the program
+DIFF_FILE_NAME="diff.tmp" # Differences between expected and real STDOUT
 
 VERBOSE=0 # Default value of 
 
@@ -50,6 +51,7 @@ done
 date
 echo "Running tests of feedreader:"
 
+RETURN_PATH=$(realpath .)
 for TEST in $TEST_DIR
 do
     if [ -d $TEST ]
@@ -71,16 +73,18 @@ do
                 DESCRIPTION=""
             fi
 
-            ERROR_FILE=$TEST/$ERROR_FILE_NAME
-            RESULT_FILE=$TEST/$RESULT_FILE_NAME
-            eval "${PROGRAM_PATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}" # Testing
+            ERROR_FILE=$ERROR_FILE_NAME
+            RESULT_FILE=$RESULT_FILE_NAME
+            PROGRAM_REALPATH=$(realpath ${PROGRAM_PATH})
+            cd $TEST # Go to Directory with current test
+            eval "${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}" # Testing
             RETURN_CODE=$?
             
             REASON=""
             RESULT=$PASSED_MSG
-            if [ -f "$TEST/$RET_CODE_FILE_NAME" ]
+            if [ -f "$RET_CODE_FILE_NAME" ]
             then
-                read EXPECTED_RETURN_CODE < "$TEST/$RET_CODE_FILE_NAME"
+                read EXPECTED_RETURN_CODE < "$RET_CODE_FILE_NAME"
 
                 if [ $EXPECTED_RETURN_CODE != $RETURN_CODE ]
                 then
@@ -89,9 +93,9 @@ do
                 fi
             fi
 
-            if [ -f "$TEST/$OUTPUT_FILE_NAME" ]
+            if [ -f "$OUTPUT_FILE_NAME" ]
             then
-                diff $RESULT_FILE $TEST/$OUTPUT_FILE_NAME > /dev/null
+                diff $RESULT_FILE $OUTPUT_FILE_NAME > $DIFF_FILE_NAME
                 if [ $? != 0 ]
                 then
                     REASON="${REASON}Different outputs! (use -v to preserve $RESULT_FILE_NAME file)\n"
@@ -99,10 +103,9 @@ do
                 fi
             fi
 
-
             if [ $VERBOSE != 1 ] # Remove temporary files
             then
-                rm $ERROR_FILE $RESULT_FILE
+                rm $ERROR_FILE $RESULT_FILE $DIFF_FILE_NAME
             fi
 
             echo -e "$RESULT\t$DESCRIPTION"
@@ -110,6 +113,8 @@ do
             then
                 echo -e -n "Why: \t$REASON"
             fi
+
+            cd $RETURN_PATH # Return to default directory
         else
             echo -e "\033[0;33mMandatory '$TEST_FILE_NAME' file in the test directory '$TEST' was not found!\033[0m"
         fi
