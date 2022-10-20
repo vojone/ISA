@@ -368,6 +368,7 @@ int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url) {
     xmlNodePtr root = xmlDocGetRootElement(xml); //< Get The root element of XML doc
     if(!root) {
         printerr(INTERNAL_ERROR, "Unable to find root node of XML document from '%s'!", url);
+        xmlFreeDoc(xml);
         return INTERNAL_ERROR;
     }
 

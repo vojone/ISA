@@ -105,7 +105,7 @@ do
 
             if [ $VERBOSE != 1 ] # Remove temporary files
             then
-                rm $ERROR_FILE $RESULT_FILE $DIFF_FILE_NAME
+                rm -f $ERROR_FILE $RESULT_FILE $DIFF_FILE_NAME
             fi
 
             echo -e "$RESULT\t$DESCRIPTION"

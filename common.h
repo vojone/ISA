@@ -25,6 +25,15 @@
 
 #define ABS(x) (unsigned int)((x > 0) ? x : -x)
 
+
+typedef enum src_type {
+    FILE_SRC,
+    HTTP_SRC,
+    HTTPS_SRC,
+    UNKNOWN,
+} src_type_t;
+
+
 /**
  * @brief Enum of supported MIME types
  *  
@@ -194,12 +203,16 @@ void erase_string(string_t *string);
 /**
  * @brief Truncates string from start of from the end (it does not change 
  * the allocated size, it just rewrites characters to the '\0' or shift them)
+ * @warning String must be zero terminated!!!
  * 
  * @param string String to be truncated
  * @param n Number of chars that should be removed from string (if it is negative
  * it means remove them from the end)
  */
 void trunc_string(string_t *string, int n);
+
+
+void string_to_lower(string_t *string);
 
 
 /**

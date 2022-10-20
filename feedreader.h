@@ -19,5 +19,6 @@
 #include "cli.h"
 #include "http.h"
 #include "feed.h"
+#include "url.h"
 
 

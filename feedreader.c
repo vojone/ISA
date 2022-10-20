@@ -185,12 +185,53 @@ int parse_and_print(char *feed, int exp_type, settings_t *settings, char *url) {
 }
 
 
-int load_data(h_url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
-    if(!strcmp("https://", p_url->h_url_parts[SCHEME_PART]->str)) {
-        return https_connect(p_url, data_buff, url, s);
+int load_from_file(url_t *p_url, string_t *data_buff) {
+    char *path = p_url->url_parts[PATH]->str;
+    FILE *src = fopen(path, "r");
+    if(!src) {
+        printerr(FILE_ERROR, "Unable to open file on path '%s'! (%s)", path, strerror(errno));
+        return FILE_ERROR;
     }
-    else {
-        return http_connect(p_url, data_buff, url);
+
+    size_t newly_read_b = 1, empty_size = data_buff->size;
+    size_t last_size = data_buff->size;
+
+    while(newly_read_b > 0) {
+        newly_read_b = fread(data_buff->str, sizeof(char), empty_size, src);
+        empty_size -= newly_read_b;
+
+        if(empty_size == 0) {
+            if((data_buff = ext_string(data_buff)) == NULL) {
+                printerr(INTERNAL_ERROR, "Unable to extend buffer for data!");
+                fclose(src);
+                return INTERNAL_ERROR;
+            }
+
+            empty_size = data_buff->size - last_size;
+        }
+    }
+    if(errno != 0) {
+        printerr(FILE_ERROR, "Error while reading data from file '%s'!", path);
+        return FILE_ERROR;
+    }
+
+    fclose(src);
+
+    return SUCCESS;
+}
+
+
+int load_data(url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
+    switch(p_url->type) {
+        case FILE_SRC:
+            return load_from_file(p_url, data_buff);
+        case HTTPS_SRC:
+            return https_connect(p_url, data_buff, url, s);
+        case HTTP_SRC:
+            return http_connect(p_url, data_buff, url);
+        default:
+            printerr(URL_ERROR, "Unsupported type of source ('%s')!", url);
+            return URL_ERROR;
     }
 }
 
@@ -198,46 +239,61 @@ int load_data(h_url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
 typedef struct data_ctx {
     char* doc_start;
     int exp_type;
-    h_url_t *parsed_url;
+    url_t *parsed_url;
     char *url;
 } data_ctx_t;
+
+
+int parse_http_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
+    h_resp_t parsed_resp;
+    init_h_resp(&parsed_resp);
+
+    erase_h_resp(&parsed_resp);
+    int ret = parse_http_resp(&parsed_resp, data_buff, ctx->url);
+    if(ret != SUCCESS) {
+        return ret;
+    }
+
+    ret = check_http_resp(&parsed_resp, current, ctx->url);
+    if(ret != SUCCESS) {
+        return ret;
+    }
+
+    ctx->exp_type = parsed_resp.doc_type;
+    ctx->doc_start = parsed_resp.msg;
+
+    #ifdef DEBUG
+        fprintf(stderr, "HTTP hdr position:\n");
+        fprintf(stderr, "Version: %ld %ld\n", parsed_resp.version.st - data_buff->str, parsed_resp.version.len);
+        fprintf(stderr, "Status: %ld %ld\n", parsed_resp.status.st - data_buff->str, parsed_resp.status.len);
+        fprintf(stderr, "Phrase: %ld %ld\n", parsed_resp.phrase.st - data_buff->str, parsed_resp.phrase.len);
+        fprintf(stderr, "Location: %ld %ld\n", parsed_resp.location.st - data_buff->str, parsed_resp.location.len);
+        fprintf(stderr, "Content-Type: %ld %ld\n", parsed_resp.content_type.st - data_buff->str, parsed_resp.content_type.len);
+        //fprintf(stderr, "Msg: %s\n", parsed_resp.msg);
+    #endif
+
+    return ret;
+}
 
 
 int parse_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
     int ret = SUCCESS;
 
-    char *scheme = ctx->parsed_url->h_url_parts[SCHEME_PART]->str;
-    if(!strcmp(scheme, "https://") || !strcmp(scheme, "http://")) {
-        h_resp_t parsed_resp;
-        init_h_resp(&parsed_resp);
+    char *scheme = ctx->parsed_url->url_parts[SCHEME_PART]->str;
+    src_type_t src_type = ctx->parsed_url->type;
 
-        erase_h_resp(&parsed_resp);
-        ret = parse_http_resp(&parsed_resp, data_buff, ctx->url);
-        if(ret != SUCCESS) {
-            return ret;
-        }
-
-        ret = check_http_resp(&parsed_resp, current, ctx->url);
-        if(ret != SUCCESS) {
-            return ret;
-        }
-
-        ctx->exp_type = parsed_resp.doc_type;
-        ctx->doc_start = parsed_resp.msg;
-
-        #ifdef DEBUG
-            fprintf(stderr, "HTTP hdr position:\n");
-            fprintf(stderr, "Version: %ld %ld\n", parsed_resp.version.st - data_buff->str, parsed_resp.version.len);
-            fprintf(stderr, "Status: %ld %ld\n", parsed_resp.status.st - data_buff->str, parsed_resp.status.len);
-            fprintf(stderr, "Phrase: %ld %ld\n", parsed_resp.phrase.st - data_buff->str, parsed_resp.phrase.len);
-            fprintf(stderr, "Location: %ld %ld\n", parsed_resp.location.st - data_buff->str, parsed_resp.location.len);
-            fprintf(stderr, "Content-Type: %ld %ld\n", parsed_resp.content_type.st - data_buff->str, parsed_resp.content_type.len);
-            //fprintf(stderr, "Msg: %s\n", parsed_resp.msg);
-        #endif
-    }
-    else {
-        printerr(URL_ERROR, "Unknown scheme!");
-        return URL_ERROR;
+    switch(src_type) {
+        case HTTP_SRC:
+        case HTTPS_SRC:
+            ret = parse_http_data(ctx, current, data_buff);
+            break;
+        case FILE_SRC:
+            ctx->doc_start = data_buff->str;
+            ctx->exp_type = XML;
+            break;
+        default:
+            printerr(URL_ERROR, "Unsupported source type '%s'!", scheme);
+            return URL_ERROR;
     }
 
     return ret;
@@ -257,8 +313,8 @@ int parse_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
 int do_feedread(list_t *url_list, settings_t *settings) {
     list_el_t *current = url_list->header;
 
-    h_url_t parsed_url;
-    init_h_url(&parsed_url);
+    url_t parsed_url;
+    init_url(&parsed_url);
 
     string_t *data_buff = new_string(INIT_NET_BUFF_SIZE);
     if(!data_buff) {
@@ -272,8 +328,8 @@ int do_feedread(list_t *url_list, settings_t *settings) {
         int *ret = &(current->result);
         char *url = current->string->str;
 
-        erase_h_url(&parsed_url);
-        if((*ret = parse_h_url(url, &parsed_url, "https://")) != SUCCESS) { //< Parsing of URL (with default scheme 'https://')
+        erase_url(&parsed_url);
+        if((*ret = parse_url(url, &parsed_url)) != SUCCESS) { //< Parsing of URL (with default scheme 'https://')
             continue;
         }
 
@@ -296,7 +352,7 @@ int do_feedread(list_t *url_list, settings_t *settings) {
     }
 
     string_dtor(data_buff);
-    h_url_dtor(&parsed_url);
+    url_dtor(&parsed_url);
 
     return SUCCESS;
 }

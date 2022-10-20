@@ -164,8 +164,15 @@ void trunc_string(string_t *string, int n) {
             str[i] = str[trunc_n + i]; //< Move characters to beginning to remove characters at the begining 
         }
     }
-    else { //< - mens from the end
-        memset(&(str[string->size - trunc_n - 1]), 0, trunc_n); //< Remove characters from the end (replace them by '\0')
+    else { //< - means from the end
+        memset(&(str[strlen(string->str) - trunc_n]), 0, trunc_n); //< Remove characters from the end (replace them by '\0')
+    }
+}
+
+
+void string_to_lower(string_t *string) {
+    for(size_t i = 0; i < string->size; i++) {
+        string->str[i] = tolower(string->str[i]);
     }
 }
 
