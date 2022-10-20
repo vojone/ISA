@@ -107,7 +107,6 @@ int set_feed_field(xmlChar **field, xmlChar *new_content, const char *tag) {
     }
 
     if(*field) {
-        fprintf(stderr, "Field: %s %s\n", *field, new_content);
         xmlFree(*field);
         *field = NULL;
     }
@@ -385,22 +384,26 @@ int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url) {
 }
 
 
+bool is_known(xmlChar *field) {
+    return field && strlen((char *)field);
+}
+
+
 void print_feed_doc(feed_doc_t *feed_doc, settings_t *settings) {
-    printf("*** %s ***\n", feed_doc->src_name);
+    
+    printf("*** %s ***\n", is_known(feed_doc->src_name) ? (char *)feed_doc->src_name : "<unnamed source>");
 
     feed_el_t *feed = feed_doc->feed;
     while(feed) {
-        if(feed->title) {
-            printf("%s\n", feed->title);
-        }
+        printf("%s\n", is_known(feed->title) ? (char*)feed->title : "<unnamed item>");
 
-        if(feed->auth_name && settings->author_flag) {
+        if(is_known(feed->auth_name) && settings->author_flag) {
             printf("Author: %s\n", feed->auth_name);
         }
-        if(feed->url && settings->asoc_url_flag) {
+        if(is_known(feed->url) && settings->asoc_url_flag) {
             printf("URL: %s\n", feed->url);
         }
-        if(feed->updated && settings->time_flag) {
+        if(is_known(feed->updated) && settings->time_flag) {
             printf("Updated: %s\n", feed->updated);
         }
 

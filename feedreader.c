@@ -193,13 +193,19 @@ int load_from_file(url_t *p_url, string_t *data_buff) {
         return FILE_ERROR;
     }
 
-    size_t newly_read_b = 1, empty_size = data_buff->size;
+    size_t b_read = 0, newly_read_b = 1, empty_size = data_buff->size;
     size_t last_size = data_buff->size;
 
-    while(newly_read_b > 0) {
-        newly_read_b = fread(data_buff->str, sizeof(char), empty_size, src);
-        empty_size -= newly_read_b;
+    while(!feof(src)) {
+        char *mem_dest = &(data_buff->str[b_read]);
+        newly_read_b = fread(mem_dest, sizeof(char), empty_size, src);
+        if(newly_read_b == 0 && !feof(src)) {
+            printerr(FILE_ERROR, "Error while reading data from file '%s'!", path);
+            return FILE_ERROR;
+        }
 
+        b_read += newly_read_b;
+        empty_size -= newly_read_b;
         if(empty_size == 0) {
             if((data_buff = ext_string(data_buff)) == NULL) {
                 printerr(INTERNAL_ERROR, "Unable to extend buffer for data!");
@@ -210,12 +216,12 @@ int load_from_file(url_t *p_url, string_t *data_buff) {
             empty_size = data_buff->size - last_size;
         }
     }
-    if(errno != 0) {
-        printerr(FILE_ERROR, "Error while reading data from file '%s'!", path);
-        return FILE_ERROR;
-    }
 
     fclose(src);
+
+    #ifdef DEBUG
+        fprintf(stderr, "File content:\n%s\n\n", data_buff->str);
+    #endif
 
     return SUCCESS;
 }

@@ -123,6 +123,14 @@ int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url);
 
 
 /**
+ * @brief Returns true if field is set (it is not null and its lenght is > 0)
+ * @param field Field to be checked
+ * @return true if field is known
+ */
+bool is_known(xmlChar *field);
+
+
+/**
  * @brief Prints formatted feed to stdout
  * 
  * @param feed_doc Structure with information from feed document that should be printed
