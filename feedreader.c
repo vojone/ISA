@@ -31,29 +31,6 @@ int validate_settings(settings_t *settings) {
 }
 
 
-/**
- * @brief Moves string buffer (with URL) to linked list as new element
- * 
- * @param buffer Buffer its value should be copied to the element of list
- * @param dst_list Target list
- * @return int SUCCESS if moving went OK
- * @note buffer is erased
- */
-int move_to_list(string_t *buffer, list_t *dst_list) {
-    list_el_t *new_url = new_element(buffer->str);
-    if(!new_url) {
-        printerr(INTERNAL_ERROR, "Unable to move '%s' to the list!", buffer->str);
-        return INTERNAL_ERROR;
-    }
-
-    new_url->indirect_lvl = 0; //< It is original URL
-
-    list_append(dst_list, new_url);
-    erase_string(buffer);
-
-    return SUCCESS;
-}
-
 
 /**
  * @brief Processes character from the feedfile to create the list with URLs
@@ -77,7 +54,8 @@ int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
             printerr(INTERNAL_ERROR, "Unable to move URL to the list!");
             return INTERNAL_ERROR;
         }
-        
+
+        erase_string(buff); //< Clear buffer
         *len = 0;
     }
     else if((*len == 0 && c == '\n') || isspace(c) || *is_cmnt) { //< Characters to be ignored
@@ -134,6 +112,8 @@ int parse_feedfile(char *path, list_t *url_list) {
             fclose(file_ptr);
             return ret;
         }
+
+        erase_string(buffer); //< Clear buffer
     }
 
     #ifdef DEBUG //Prints all urls from url list

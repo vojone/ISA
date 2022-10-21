@@ -87,6 +87,23 @@ list_el_t *new_element(char *str_content) {
 }
 
 
+list_el_t *new_element_non_dup(string_t *content, size_t indirection_lvl) {
+    list_el_t *new = (list_el_t *)malloc(sizeof(list_el_t));
+    if(!new) { //< Allocation error
+        return NULL;
+    }
+
+    new->string = content;
+
+    //Initialization
+    new->indirect_lvl = indirection_lvl;
+    new->result = SUCCESS;
+    new->next = NULL;
+
+    return new;
+}
+
+
 list_el_t *slice2element(string_slice_t *slice, size_t indir_level) {
     list_el_t *new = (list_el_t *)malloc(sizeof(list_el_t));
     if(!new) {
@@ -145,6 +162,21 @@ void list_append(list_t *list, list_el_t *new_element) {
 }
 
 
+int move_to_list(string_t *buffer, list_t *dst_list) {
+    list_el_t *new_url = new_element(buffer->str);
+    if(!new_url) {
+        printerr(INTERNAL_ERROR, "Unable to move '%s' to the list!", buffer->str);
+        return INTERNAL_ERROR;
+    }
+
+    new_url->indirect_lvl = 0; //< It is original URL
+
+    list_append(dst_list, new_url);
+
+    return SUCCESS;
+}
+
+
 void erase_string(string_t *string) {
     if(string) {
         if(string->str) {
@@ -187,6 +219,18 @@ string_t *app_char(string_t **dest, char c) {
     (*dest)->str[strlen((*dest)->str)] = c;
 
     return *dest; //< Return pointer to the (reallocated) string
+}
+
+
+string_t *app_string(string_t **dest, char *src) {
+    for(int i = 0; src[i]; i++) {
+        *dest = app_char(dest, src[i]);
+        if(!(*dest)) {
+            return NULL;
+        }
+    }
+
+    return *dest;
 }
 
 
@@ -271,7 +315,7 @@ string_t *new_string(size_t size) {
 }
 
 
-string_t *slice_to_string(string_slice_t *slice) {
+string_t *slice2string(string_slice_t *slice) {
     string_t *string = new_string(slice->len + 1);
     if(!string) {
         return NULL;

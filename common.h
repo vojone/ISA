@@ -157,6 +157,9 @@ bool is_line_empty(char *line_start_ptr);
 list_el_t *new_element(char *str_content);
 
 
+list_el_t *new_element_non_dup(string_t *content, size_t indirection_lvl);
+
+
 /**
  * @brief Creates new linked list element from string described in pointed slice
  * 
@@ -193,6 +196,16 @@ void list_append(list_t *list, list_el_t *new_element);
 
 
 /**
+ * @brief Moves string buffer to linked list as a new element
+ * 
+ * @param buffer Buffer its value should be copied to the element of list
+ * @param dst_list Target list
+ * @return int SUCCESS if moving went OK
+ */
+int move_to_list(string_t *buffer, list_t *dst_list);
+
+
+/**
  * @brief Sets all allocated bytes of string to the 0 ('\0')
  * 
  * @param string String to be erased
@@ -225,6 +238,9 @@ void string_to_lower(string_t *string);
  * @warning Always get pointer of the returned string (there may be reallocation)
  */
 string_t *app_char(string_t **dest, char c);
+
+
+string_t *app_string(string_t **dest, char *src);
 
 
 /**
@@ -277,7 +293,7 @@ string_t *new_string(size_t size);
  * @param slice Slice from which the new string hsould be created
  * @return string_t* Newly created string described by slice in argument or NULL
  */
-string_t *slice_to_string(string_slice_t *slice);
+string_t *slice2string(string_slice_t *slice);
 
 
 /**

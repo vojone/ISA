@@ -19,6 +19,8 @@
 # of expected return code or output (depends on missing file)
 #
 # For preserving output files (*.tmp) use -v option, otherwise thy are deleted
+# For running tests with valgrind use -m option (in this case is dependent on 
+# valgrind)
 
 PROGRAM_PATH="./feedreader"
 
@@ -31,22 +33,44 @@ RET_CODE_FILE_NAME="ret"
 RESULT_FILE_NAME="out.tmp" # File with STDOUT that was produced by the program
 ERROR_FILE_NAME="err.tmp" # File with STDERR that was produced by the program
 DIFF_FILE_NAME="diff.tmp" # Differences between expected and real STDOUT
+VALGRIND_LOG_FILE_NAME="valgrind.tmp"
 
-VERBOSE=0 # Default value of 
+VERBOSE=0 # Default value of verbose
+MEMCHECK=0 # Default value of memcheck
 
 PASSED_MSG="[ \033[0;32mPASSED\033[0m ]"
 FAILED_MSG="[ \033[0;31mFAILED\033[0m ]"
 
+
 # Parse options
-while getopts "v" OPT
+while getopts "vmh" OPT
 do
     if [ "$OPT" = "v" ]
     then
         VERBOSE=1
+    elif [ "$OPT" = "m" ]
+    then
+        MEMCHECK=1
+    elif [ "$OPT" = "h" ]
+    then
+        echo "Test script of feedreader program."
+        echo
+        echo "USAGE: ./feedreadertest.sh [OPTIONS]..."
+        echo
+        echo "Options:"
+        echo -e "-m\tActivates memory checks (valgrind is needed)"
+        echo -e "-v\tPreserves temporary files in test folders (for debugging)"
+        echo -e "-h\tPrints help and ends program"
+        echo
+        echo "Return codes:"
+        echo "0 - All tests passed"
+        echo "1 - There are failed tests"
+        exit 0
     fi
 done
 
-
+PASSED_NUM=0
+TOTAL_NUM=0
 
 date
 echo "Running tests of feedreader:"
@@ -77,7 +101,13 @@ do
             RESULT_FILE=$RESULT_FILE_NAME
             PROGRAM_REALPATH=$(realpath ${PROGRAM_PATH})
             cd $TEST # Go to Directory with current test
-            eval "${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}" # Testing
+
+            if [ $MEMCHECK == 1 ] # Testing
+            then
+                eval "valgrind --leak-check=full --log-file=\"${VALGRIND_LOG_FILE_NAME}\" ${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
+            else
+                eval "${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
+            fi
             RETURN_CODE=$?
             
             REASON=""
@@ -103,16 +133,35 @@ do
                 fi
             fi
 
+            if [ $MEMCHECK == 1 ]
+            then
+                VALGRIND_LOG_TAIL=`cat ${VALGRIND_LOG_FILE_NAME} | tail -1`
+                VALGRIND_ERROR_SUM=`echo -n ${VALGRIND_LOG_TAIL} | grep "ERROR SUMMARY: [1-9][0-9]*" -`
+                if [[ $VALGRIND_ERROR_SUM != "" ]]
+                then
+                    REASON="${REASON}${VALGRIND_LOG_TAIL}\n"
+                    RESULT=$FAILED_MSG
+                fi
+            fi
+
             if [ $VERBOSE != 1 ] # Remove temporary files
             then
-                rm -f $ERROR_FILE $RESULT_FILE $DIFF_FILE_NAME
+                rm -f $ERROR_FILE $RESULT_FILE $DIFF_FILE_NAME $VALGRIND_LOG_FILE_NAME
             fi
 
             echo -e "$RESULT\t$DESCRIPTION"
-            if [[ $REASON != "" ]]
+            if [[ "$REASON" != "" ]]
             then
                 echo -e -n "Why: \t$REASON"
             fi
+
+            echo $RESULT
+            if [[ "$RESULT" != "$FAILED_MSG" ]]
+            then
+                PASSED_NUM=$(expr $PASSED_NUM + 1)
+            fi
+
+            TOTAL_NUM=$(expr $TOTAL_NUM + 1)
 
             cd $RETURN_PATH # Return to default directory
         else
@@ -120,3 +169,13 @@ do
         fi
     fi
 done 
+
+
+echo "Summary: ${PASSED_NUM}/${TOTAL_NUM} tests passed"
+
+if [ $PASSED_NUM == $TOTAL_NUM ]
+then
+    exit 0
+else
+    exit 1
+fi

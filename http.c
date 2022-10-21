@@ -240,15 +240,34 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
         return HTTP_ERROR;
     }
     else if(p_resp->location.st != NULL) {
-        size_t new_lvl = cur_url->indirect_lvl + 1;
-        list_el_t *new_url = slice2element(&(p_resp->location), new_lvl);
-        if(!new_url) {
+        size_t lvl = cur_url->indirect_lvl + 1;
+
+        string_t *location = slice2string(&(p_resp->location));
+        if(!location) {
             printerr(INTERNAL_ERROR, "Unable to allocate memory for new URL!");
             return INTERNAL_ERROR;
         }
 
-        new_url->next = cur_url->next;
-        cur_url->next = new_url;
+        bool is_path_result = false;
+        int ret;
+        if((ret = is_path(&is_path_result, p_resp->location.st)) != SUCCESS) {
+            return ret;
+        }
+
+        if(is_path_result) {
+            string_t *tmp = replace_path(cur_url->string, location);
+            string_dtor(location);
+            location = tmp;
+        }
+
+        list_el_t *new_element = new_element_non_dup(location, lvl);
+        if(!new_element) {
+            printerr(INTERNAL_ERROR, "Unable to create new URL for redirect from '%s'!", cur_url->string->str);
+            return INTERNAL_ERROR;
+        }
+
+        new_element->next = cur_url->next;
+        cur_url->next = new_element;
     }
     else {
         printerr(HTTP_ERROR, "Unable to redirect, because Location header was not found!");
@@ -311,7 +330,7 @@ int find_mime(h_resp_t *p_resp, char *url) {
         return ret;
     }
 
-    string_t *content_type = slice_to_string(&(p_resp->content_type));
+    string_t *content_type = slice2string(&(p_resp->content_type));
     if(!content_type) {
         printerr(INTERNAL_ERROR, "Unable to allocate temporary buffer for MIME type!");
         return INTERNAL_ERROR;
@@ -341,13 +360,13 @@ int find_mime(h_resp_t *p_resp, char *url) {
 
 
 int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
-    string_t *status = slice_to_string(&(p_resp->status));
+    string_t *status = slice2string(&(p_resp->status));
     if(!status) {
         printerr(INTERNAL_ERROR, "Unable to allocate buffer for HTTP status code!");
         return INTERNAL_ERROR;
     }
 
-    string_t *phrase = slice_to_string(&(p_resp->phrase));
+    string_t *phrase = slice2string(&(p_resp->phrase));
     if(!status) {
         printerr(INTERNAL_ERROR, "Unable to allocate buffer for HTTP phrase!");
         return INTERNAL_ERROR;

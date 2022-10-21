@@ -80,6 +80,10 @@ void init_url(url_t *url);
 
 void url_dtor(url_t *url);
 
+string_t *replace_path(string_t *orig_url, string_t *path);
+
+int is_path(bool *result, char *str);
+
 void erase_url(url_t *url);
 
 int parse_url(char *url, url_t *parsed_url);

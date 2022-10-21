@@ -41,6 +41,45 @@ void free_all_url_patterns(regex_t *regexes) {
 }
 
 
+string_t *replace_path(string_t *orig_url, string_t *path) {
+    url_t url;
+    init_url(&url);
+
+    string_t *new_url = new_string(INIT_STRING_SIZE);
+    if(!new_url) {
+        return NULL;
+    }
+
+    int ret = parse_url(orig_url->str, &url);
+    if(ret != SUCCESS) { //< We ignore return codes because orig url should be already checked
+        return NULL;
+    }
+
+    for(int i = 0; i < PATH; i++) {
+        if(!app_string(&new_url, url.url_parts[i]->str)) {
+            url_dtor(&url);
+            return NULL;
+        }
+    }
+
+    if(path->str[0] != '/') { //< Path is relative
+        if(!app_string(&new_url, url.url_parts[PATH]->str)) {
+            url_dtor(&url);
+            return NULL;
+        }
+    }
+
+    if(!app_string(&new_url, path->str)) { //< Append new path
+        url_dtor(&url);
+        return NULL;
+    }
+
+    url_dtor(&url);
+
+    return new_url;
+}
+
+
 int is_path(bool *result, char *str) {
     regex_t path_re[PATH_RE_NUM];
     regmatch_t matches[PATH_RE_NUM];
