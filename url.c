@@ -167,7 +167,6 @@ int prepare_url_patterns(regex_t *regexes) {
  * possible edge cases it does not result in error)
  */
 
-//TODO (RFC1123)
 int res_url(bool is_inv, bool int_err, int *res, url_t *p_url, char *url) {
     if(int_err) {
         printerr(INTERNAL_ERROR, "Error while parsing URL!");
@@ -305,7 +304,7 @@ int parse_url(char *url, url_t *p_url) {
         fprintf(stderr, "i\tres\tstart\tend\n");
         for(int i = 0; i < RE_URL_NUM; i++) {
             fprintf(stderr, "%d\t%d\t", i, res[i]);
-            if(res[i] == 0) fprintf(stderr, "%d\t%d\t%s", regmatch[i].rm_so, regmatch[i].rm_eo, p_url->url_parts[i]->str);
+            if(res[i] == 0) fprintf(stderr, "%ld\t%ld\t%s", (size_t)regmatch[i].rm_so, (size_t)regmatch[i].rm_eo, p_url->url_parts[i]->str);
             fprintf(stderr, "\n");
         }
         fprintf(stderr, "\n");

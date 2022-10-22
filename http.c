@@ -14,11 +14,23 @@
 
 //The process of initializing features of openssl library is based on https://developer.ibm.com/tutorials/l-openssl/
 void openssl_init() {
+    SSL_library_init();
     SSL_load_error_strings();
     ERR_load_BIO_strings();
     OpenSSL_add_all_algorithms();
 }
 //End of the part based on https://developer.ibm.com/tutorials/l-openssl/
+
+void openssl_cleanup() {
+    CRYPTO_cleanup_all_ex_data();
+    ERR_free_strings();
+    EVP_cleanup();
+    SSL_COMP_free_compression_methods();
+
+    #if OPENSSL_VERSION_NUMBER < 0x10100000L //< For lower version causes memory leaks for higher versions it is deprecated
+        ERR_remove_thread_state(NULL);
+    #endif
+}
 
 
 int send_request(BIO *bio, url_t *p_url, char *url) {
@@ -555,7 +567,7 @@ int parse_http_resp(h_resp_t *parsed_resp, string_t *response, char *url) {
     res[H_PART] = regexec(&regexes[H_PART], resp, 1, &(matches[H_PART]), 0);
 
     if(res[H_PART] == REG_NOMATCH) {
-        printerr(HTTP_ERROR, "Headers of HTTP response from '%s' was not found!", url);
+        printerr(HTTP_ERROR, "Headers of HTTP response from '%s' was not found!", url); //< RFC7230 p. 34
         ret = HTTP_ERROR;
     }
     else {

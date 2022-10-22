@@ -340,6 +340,8 @@ int do_feedread(list_t *url_list, settings_t *settings) {
     string_dtor(data_buff);
     url_dtor(&parsed_url);
 
+    openssl_cleanup();
+
     return SUCCESS;
 }
 

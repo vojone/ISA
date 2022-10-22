@@ -2,15 +2,23 @@
 # Author: Vojtěch Dvořák
 
 APP_NAME = feedreader
-CFLAGS = -std=c99 -Wall -Wextra -pedantic -I/usr/include/libxml2
-CC = gcc
 SRCS = $(APP_NAME).c common.c cli.c http.c feed.c url.c
 HEADERS = $(APP_NAME).h common.h cli.h http.h feed.h url.h
-LDLIBS = -lxml2 -lssl -lcrypto
 
+# Compiling
+CC = gcc
+LDLIBS = -lssl -lcrypto
+CFLAGS = -std=c99 -Wall -Wextra -pedantic
+
+# Adding libraries and
+CFLAGS := $(CFLAGS) `xml2-config --cflags`
+LDLIBS := $(LDLIBS) `xml2-config --libs`
+
+# Tests
 TEST_SCRIPT_NAME = feedreadertest.sh
 TEST_FOLDER_NAME = tests
 
+# Archive
 ARCHIVE_NAME = xdvora3o.tar
 IN_ARCHIVE = $(SRCS) $(HEADERS) README Makefile \
 $(TEST_SCRIPT_NAME) $(TEST_FOLDER_NAME)

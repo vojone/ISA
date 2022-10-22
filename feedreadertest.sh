@@ -155,7 +155,6 @@ do
                 echo -e -n "Why: \t$REASON"
             fi
 
-            echo $RESULT
             if [[ "$RESULT" != "$FAILED_MSG" ]]
             then
                 PASSED_NUM=$(expr $PASSED_NUM + 1)

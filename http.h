@@ -73,6 +73,8 @@ typedef struct h_resp {
 
 void openssl_init();
 
+void openssl_cleanup();
+
 int send_request(BIO *bio, url_t *p_url, char *url);
 
 int rec_response(BIO *bio, string_t *resp_b, char *url);
