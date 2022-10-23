@@ -56,7 +56,7 @@ enum re_h_resp_indexes {
 
 #define ATOM_MIME "application/atom\\+xml"
 #define RSS_MIME "application/rss\\+xml"
-#define XML_MIME "text/xml"
+#define XML_MIME "(text/xml)|(application/xml)"
 
 
 /**

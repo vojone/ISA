@@ -1,19 +1,194 @@
-# Feedreader
+# ISA project - Feedreader
 
 ## Author
 Vojtěch Dvořák (xdvora3o)
 
-## Creation Date
+## Creation date
+23. 10. 2022
 
 ## About
-Reader of news in Atom/RSS2.0 format with TLS support.
+Reader of news in Atom/RSS2.0 format with TLS support. Reads XML documents specified by URLs and prints their content in format defined by the project assignment. It is designed to be robust and modular. For details see `manual.pdf`.
 
-## Files
+## Structure of project
+- `tests` - folder with test cases 
 
-## Extensions & Limitations
+- `cli.h, cli.c` - CLI module, performs communication with user
 
-## TODO
+- `common.h, common.c` - module with auxiliary functions used across the project (e. g. dynamic string)
 
-HTTP1.1
+- `feed.h, feed.c` - module for parsing of RSS2.0/ATOM document and printing result to the stdout
 
-Tests
+- `feedreader.h`, `feedreader.c` - main of the program
+
+- `feedreadertest.sh` - test script for program
+
+- `http.h, http.c` - module with function, that performs HTTP(S) connection and fetching, checking and parsing data via HTTP(S)
+
+- `url.h, url.c` - module that is reponsible for processing of URLs
+
+- `Makefile` - project Makefile
+
+- `README` - this file
+
+- `manual.pdf` - project documentation
+
+
+## Libraries and other dependencies
+Program uses following standard libraries for C language:
+`stdio.h`
+
+`stdlib.h`
+
+`stdbool.h`
+
+`stdarg.h`
+
+`string.h`
+
+`ctype.h`
+
+`sys`
+
+`time.h`
+
+`strings.h`
+
+`errno.h`
+
+`poll.h`
+
+`regex.h`
+
+
+Program is also dependent on these libraries:
+`libxml2` - necessary for parsing XML (see `feed` module)
+
+`openssl` - it is used for fetching data through HTTP(S)
+
+## Usage
+Use `make` (or `make debug`) command to compile the program and create the binary. Then test of the program can be executed by `make test` or it can be executed by following scheme: 
+
+Usage:
+
+`./feedreader <URL | -f <feedfile>> [OPTIONS]`
+
+- `URL`   URL address of source (accepted schemes: `http://`, `https://`, `file://`)
+
+- `-f feedfile`     defines path to feedfile with URLs, fomat of feedfile is defined by the project assignment
+
+Options:
+- `-h`, `--help`    Prints help to std output and then terminates the program 
+
+- `-c certfile`   Defines path to the file with certificates, that will be used for verification of server certificate
+
+- `-C certaddr`   Defines path to the folder with certificates, that will be used for verification of server certificate    
+
+- `-T`  Activates priting of last update time
+
+- `-a`  Activates printing of author name  
+
+- `-u`  Activates printing of associated URL
+
+
+## Examples
+Simple reading of one RSS source:
+```
+./feedreader http://rss.cnn.com/rss/cnn_topstories.rss
+```
+
+Output (output may differ due to current feed):
+```
+*** CNN.com - RSS Channel - HP Hero ***
+Many say they were shocked and moved by the lone demonstrator and feel compelled to show support
+Xi enters third term as China's most powerful leader in decades
+Xi's protégé took second highest position as China reveals new leadership 
+Analysis: The greatest risk to China's Xi Jinping? Himself
+Former Chinese leader led out of room as Communist Party Congress comes to a close
+Opinion: China had a system. Then along came Xi
+...
+A comprehensive guide to baking at high altitudes
+
+```
+
+
+Reading of one RSS source (using HTTPS) with some options:
+```
+./feedreader https://cdn.feedcontrol.net/8/1114-wioSIX3uu8MEj.xml -Tu
+```
+
+Output (output may differ due to current feed):
+```
+*** Reuters home page ***
+Dow posts record closing high, stocks gain for 3rd week; dollar dips
+URL: https://www.reuters.com/business/global-markets-wrapup-7-graphics-2021-10-22/
+Updated: Sat, 23 Oct 2021 00:53:12 +0000
+
+Prop guns spark debate after cinematographer's death on set
+URL: https://www.reuters.com/world/us/prop-guns-spark-debate-after-cinematographers-death-set-2021-10-22/
+Updated: Sat, 23 Oct 2021 00:19:06 +0000
+
+...
+
+Viral video, opinions challenge Georgia jury selection for Arbery case
+URL: https://www.reuters.com/world/us/viral-video-opinions-challenge-georgia-jury-selection-arbery-case-2021-10-22/
+Updated: Fri, 22 Oct 2021 17:20:09 +0000
+
+```
+
+
+Reading multiple sources (Atom and RSS) specified in feedfile:
+```
+./feedreader -f example_feedfile1
+```
+
+Feedfile:
+```
+#Atom source
+https://xkcd.com/atom.xml
+#RSS sources
+https://rss.acast.com/unraveled
+https://rss.art19.com/apology-line
+
+```
+
+Output (output may differ due to current feed):
+```
+*** xkcd.com ***
+Bubble Universes
+Division Notation
+Space Adventure
+2045
+
+*** Unraveled ***
+Introducing Hillsong: A Megachurch Shattered
+S5 Ep.5: The Profiler's Dilemma
+S5 Ep.4: Family Secrets
+...
+S1 Ep. 1: David and Goliath
+Introducing Unraveled: Long Island Serial Killer
+
+*** The Apology Line ***
+Wondery Presents: The Generation Why Podcast
+Wondery Presents - The Rewatcher: Buffy The Vampire Slayer
+Introducing: The Apology Line 
+
+
+```
+
+
+## Extensions
+- Support of HTTP redirection (if program got 3xx status code, redirects user to the new adress given by `Location:` header)
+
+- `file://` URL scheme (reading from file given by absolute path)
+
+- Percent encoding of URL path - if there are any characters that are not allowed by the RFC3986, they should converted to the percent encoded equivalent (all inputs must be in UTF-8) 
+
+## References
+The sources of know-how, that was necessary to make this project:
+https://www.rfc-editor.org/
+https://developer.ibm.com/tutorials/l-openssl/
+https://www.openssl.org/docs/
+http://www.xmlsoft.org/examples/
+
+and manual pages
+

@@ -132,6 +132,7 @@ bool is_known(xmlChar *field);
 
 /**
  * @brief Prints formatted feed to stdout
+ * @note To change format of output, modify this function
  * 
  * @param feed_doc Structure with information from feed document that should be printed
  * @param settings Settings structure to determine which information should be printed

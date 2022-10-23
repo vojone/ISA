@@ -451,7 +451,7 @@ int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
 
 int prepare_resp_patterns(regex_t *regexes) {
     char *patterns[RE_H_RESP_NUM] = { //< There is always ^ because we always match pattern from start of the string 
-        "^([^\\s]|\r\n)*\r\n\r\n",
+        "^(.|\r\n)*\r\n\r\n",
         "^.*\r\n",
         "^[^ \t]*",
         "^[0-9]{3}",
