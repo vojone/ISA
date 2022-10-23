@@ -290,12 +290,14 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
     }
 
     bool is_supported = !xmlStrcasecmp(v, (const xmlChar *)RSS_VERSION); //< Check RSS version (mandatory tag)
-    xmlFree(v);
 
     if(!is_supported) {
         printerr(FEED_ERROR, "Unsupported version of RSS. Supported '%s' got '%s'!", RSS_VERSION, v);
+        xmlFree(v);
         return FEED_ERROR;
     }
+
+    xmlFree(v);
 
     while(channel) { //< There should be maximum one and only one channel tag (but ,for better robustness, mutliple of them are accepted )
         if(hasName(channel, "channel")) {
@@ -380,7 +382,7 @@ int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url) {
     parse_f_ptr_t parsing_function = NULL;
     ret = sel_parser(root, exp_type, url, &parsing_function);
     if(ret == SUCCESS) {
-        parsing_function(root, feed_doc);
+        ret = parsing_function(root, feed_doc);
     }
 
     xmlFreeDoc(xml);

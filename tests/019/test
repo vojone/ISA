@@ -1,1 +1,2 @@
-#Reading multiple files with other info
+#Reading multiple files with other info 
+-f "example_Feedfile" -a -T -u
