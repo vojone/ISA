@@ -33,34 +33,24 @@ Reader of news in Atom/RSS2.0 format with TLS support. Reads XML documents speci
 - `manual.pdf` - project documentation
 
 
-## Libraries and other dependencies
+## Libraries and dependencies
 Program uses following standard libraries for C language:
 `stdio.h`
-
 `stdlib.h`
-
 `stdbool.h`
-
 `stdarg.h`
-
 `string.h`
-
 `ctype.h`
-
 `sys`
-
 `time.h`
-
 `strings.h`
-
 `errno.h`
-
 `poll.h`
-
 `regex.h`
 
 
 Program is also dependent on these libraries:
+
 `libxml2` - necessary for parsing XML (see `feed` module)
 
 `openssl` - it is used for fetching data through HTTP(S)
@@ -190,9 +180,13 @@ Introducing: The Apology Line
 
 ## References
 The sources of know-how, that was necessary to make this project:
+
 https://www.rfc-editor.org/
+
 https://developer.ibm.com/tutorials/l-openssl/
+
 https://www.openssl.org/docs/
+
 http://www.xmlsoft.org/examples/
 
 and manual pages
