@@ -3,7 +3,7 @@
  * @brief Source file with functions resposible for communication with the user
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022
+ * @date 23. 10. 2022
  */
 
 #include "cli.h"
@@ -84,17 +84,6 @@ void print_help() {
     print_usage();
     fprintf(stdout, "%s\n", option_msg);
 }
-
-
-/**
- * @brief Auxiliary structure to avoid too many parameters of option parsing 
- * functions
- */
-typedef struct opt {
-    char *name; //< Pointer to the name of option (usefull expecially for error messages)
-    bool *flag; //< Pointer to the variable, that signalizes that option is ON
-    char **arg; //< Pointer to the pointer to the argument of specific option
-} opt_t;
 
 
 

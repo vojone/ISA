@@ -5,7 +5,7 @@
  * @note Uses libxml2 library to parse XML docs
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022 
+ * @date 23. 10. 2022 
  */
 
 #ifndef _FEEDREADER_FEED_

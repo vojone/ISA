@@ -43,11 +43,13 @@ int send_request(BIO *bio, url_t *p_url, char *url) {
     char request_b[INIT_NET_BUFF_SIZE];
     snprintf(request_b, INIT_NET_BUFF_SIZE, 
         "GET %s " HTTP_VERSION "\r\n"
-        "Host: %s\r\n" //< Mandatory due to RFC2616
+        "Host: %s%s%s\r\n" //< Mandatory due to RFC2616
         "Connection: close\r\n" //< Connection will be closed after completition of the response
         "User-Agent: ISAFeedReader/1.0\r\n" //< Just to better filtering from the other traffic
         "\r\n",
         p_url->url_parts[PATH]->str, 
+        !is_empty(p_url->url_parts[QUERY]) ? p_url->url_parts[QUERY]->str : "",
+        !is_empty(p_url->url_parts[FRAG_PART]) ? p_url->url_parts[FRAG_PART]->str : "",
         p_url->url_parts[HOST]->str);
 
     #ifdef DEBUG
@@ -117,19 +119,30 @@ int rec_response(BIO *bio, string_t *resp_b, char *url) {
 }
 
 
+/**
+ * @brief Just auxiliary functions to free Openssl resources easily  
+ */
 void free_https_connection(BIO *bio, SSL_CTX *ctx) {
     BIO_free_all(bio);
     SSL_CTX_free(ctx);
 }
 
 
-int https_connect(url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
-    int ret = SUCCESS;
+/**
+ * @brief Loads path with certificates due to given settings_t structure
+ */
+int load_verify_paths(SSL_CTX *ctx, settings_t *s) {
+    if(s->certaddr) { //< Check whether folder exists and it is folder (to provide better troubleshooting)
+        struct stat stat_s;
+        memset(&stat_s, 0, sizeof(struct stat));
 
-    //Based on IBM tutorial https://developer.ibm.com/tutorials/l-openssl/
-    SSL_CTX *ctx = SSL_CTX_new(SSLv23_client_method());
-    SSL *ssl;
-
+        if(stat(s->certaddr, &stat_s) || !S_ISDIR(stat_s.st_mode)) {
+            printerr(PATH_ERROR, "Given path '%s' does not lead to the folder!", s->certaddr);
+            return PATH_ERROR;
+        }
+    }
+     
+    int ret = 0;
     if(!s->certfile && !s->certaddr) {
         ret = SSL_CTX_set_default_verify_paths(ctx);
     }
@@ -140,8 +153,24 @@ int https_connect(url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
     if(ret == 0) { //< Setting of paths was not succesful
         const char *appendix = s->certfile || s->certaddr ? "Please check given paths!" : "";
         printerr(PATH_ERROR, "Unable to set paths to certificate files! %s", appendix);
-        SSL_CTX_free(ctx);
         return PATH_ERROR;
+    }
+
+    return SUCCESS;
+}
+
+
+int https_load(url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
+    int ret = SUCCESS;
+
+    //Based on IBM tutorial https://developer.ibm.com/tutorials/l-openssl/
+    SSL_CTX *ctx = SSL_CTX_new(SSLv23_client_method());
+    SSL *ssl;
+
+    ret = load_verify_paths(ctx, s);
+    if(ret != SUCCESS) {
+        SSL_CTX_free(ctx);
+        return ret;
     }
 
     BIO *bio = BIO_new_ssl_connect(ctx);
@@ -195,7 +224,7 @@ int https_connect(url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
 }
 
 
-int http_connect(url_t *parsed_url, string_t *resp_b, char *url) {
+int http_load(url_t *parsed_url, string_t *resp_b, char *url) {
     int ret;
     BIO *bio = BIO_new(BIO_s_connect());
     if(!bio) {
@@ -234,9 +263,9 @@ int http_connect(url_t *parsed_url, string_t *resp_b, char *url) {
 
 int check_http_status(int status_c, string_t *phrase, char *url) {
     switch(status_c/100) {
-        case 2:
+        case 2: //< The class of Successful responses
             return SUCCESS;
-        case 3:
+        case 3: // The class of Redirection responses
             printw("Got %s (code %d) from '%s'! Redirecting...", phrase->str, status_c, url);
             return HTTP_REDIRECT;
         default:
@@ -252,7 +281,7 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
         return HTTP_ERROR;
     }
     else if(p_resp->location.st != NULL) {
-        size_t lvl = cur_url->indirect_lvl + 1;
+        size_t lvl = cur_url->indirect_lvl + 1; //< Increase redirection lvl (for safety)
 
         string_t *location = slice2string(&(p_resp->location));
         if(!location) {
@@ -262,17 +291,17 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
 
         bool is_path_result = false;
         int ret;
-        if((ret = is_path(&is_path_result, p_resp->location.st)) != SUCCESS) {
+        if((ret = is_path(&is_path_result, p_resp->location.st)) != SUCCESS) { //< Check if it is only path
             return ret;
         }
 
-        if(is_path_result) {
+        if(is_path_result) { //< If yes -> recycle old URL with new path (or append it if it is relative path)
             string_t *tmp = replace_path(cur_url->string, location);
             string_dtor(location);
             location = tmp;
         }
 
-        list_el_t *new_element = new_element_non_dup(location, lvl);
+        list_el_t *new_element = new_element_non_dup(location, lvl); //< Create new element for linked list with URLs
         if(!new_element) {
             printerr(INTERNAL_ERROR, "Unable to create new URL for redirect from '%s'!", cur_url->string->str);
             return INTERNAL_ERROR;
@@ -300,6 +329,9 @@ void erase_h_resp(h_resp_t *h_resp) {
 }
 
 
+/**
+ * @brief Initialization of array with result codes of regexec 
+ */
 void init_resp_res_arr(int *res) {
     for(int i = 0; i < RE_H_RESP_NUM; i++) {
         res[i] = REG_NOMATCH;
@@ -307,6 +339,9 @@ void init_resp_res_arr(int *res) {
 }
 
 
+/**
+ * @brief Deallocation of array with regex structures
+ */
 void free_all_patterns(regex_t *regexes, int r_num) {
     for(int i = 0; i < r_num; i++) {
         regfree(&(regexes[i]));
@@ -314,6 +349,7 @@ void free_all_patterns(regex_t *regexes, int r_num) {
 }
 
 
+//Patterns for checking mime types
 int prepare_mime_patterns(regex_t *regexes) {
     char *patterns[MIME_NUM] = {
         "^" RSS_MIME, 
@@ -332,6 +368,9 @@ int prepare_mime_patterns(regex_t *regexes) {
 }
 
 
+/**
+ * @brief Determines MIME type of response 
+ */
 int find_mime(h_resp_t *p_resp, char *url) {
     regex_t re[MIME_NUM];
     regmatch_t match[MIME_NUM];
@@ -342,7 +381,7 @@ int find_mime(h_resp_t *p_resp, char *url) {
         return ret;
     }
 
-    string_t *content_type = slice2string(&(p_resp->content_type));
+    string_t *content_type = slice2string(&(p_resp->content_type)); //Temporary string
     if(!content_type) {
         printerr(INTERNAL_ERROR, "Unable to allocate temporary buffer for MIME type!");
         return INTERNAL_ERROR;
@@ -352,8 +391,8 @@ int find_mime(h_resp_t *p_resp, char *url) {
     char *con_type_str = content_type->str;
     for(int i = 0; i < MIME_NUM; i++) {
         int res = regexec(&(re[i]), con_type_str, 1, &(match[i]), 0);
-        if(res == 0) {
-            p_resp->doc_type = i; //< Set mime type
+        if(res == 0) { //< There is any of allowed MIME types
+            p_resp->doc_type = i; //< Set MIME type
             ret = SUCCESS;
             break;
         }
@@ -391,7 +430,7 @@ int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
     string_dtor(phrase);
     string_dtor(status);
 
-    if(ret == HTTP_REDIRECT) {
+    if(ret == HTTP_REDIRECT) { //< Perform redirect (due to status)
         ret = http_redirect(p_resp, cur_url);
         if(ret == SUCCESS) {
             return HTTP_REDIRECT;
@@ -400,7 +439,7 @@ int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
     else if(ret == SUCCESS) {
 
         #ifdef CHECK_MIME_TYPE
-            if(p_resp->content_type.st) {
+            if(p_resp->content_type.st) { //< Check MIME type
                 ret = find_mime(p_resp, url);
             }
         #endif
@@ -412,14 +451,13 @@ int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
 
 int prepare_resp_patterns(regex_t *regexes) {
     char *patterns[RE_H_RESP_NUM] = { //< There is always ^ because we always match pattern from start of the string 
-        "^(.|\r\n)*\r\n\r\n",
+        "^([^\\s]|\r\n)*\r\n\r\n",
         "^.*\r\n",
         "^[^ \t]*",
         "^[0-9]{3}",
         "^[^\r\n]*",
         "^Location:",
-        "^Content-Type:",
-        "^Content-Length:"
+        "^Content-Type:"
     };
 
     for(int i = 0; i < RE_H_RESP_NUM; i++) {
@@ -433,14 +471,10 @@ int prepare_resp_patterns(regex_t *regexes) {
     return SUCCESS;
 }
 
-typedef struct resp_parse_ctx {
-    regex_t regexes[RE_H_RESP_NUM];
-    char *cursor;
-    regmatch_t regm[RE_H_RESP_NUM];
-    int res[RE_H_RESP_NUM];
-} resp_parse_ctx_t;
 
-
+/**
+ * @brief Parses one line of HTTP headers 
+ */
 void parse_hdrs(char *line_end, resp_parse_ctx_t *ctx, h_resp_t *p_resp) {
     regex_t *regexes = ctx->regexes;
     regmatch_t *matches = ctx->regm;
@@ -448,46 +482,41 @@ void parse_hdrs(char *line_end, resp_parse_ctx_t *ctx, h_resp_t *p_resp) {
     char **cursor = &(ctx->cursor);
 
     res[LOC] = regexec(&(regexes[LOC]), *cursor, 1, &(matches[LOC]), 0);
-    if(res[LOC] != REG_NOMATCH) {
+    if(res[LOC] != REG_NOMATCH) { //< It is location header! (important for redirection)
         *cursor =  skip_w_spaces(&((*cursor)[matches[LOC].rm_eo]));
         size_t len = (size_t)(line_end - *cursor);
-        p_resp->location = new_str_slice(*cursor, len - strlen("\r\n"));
+        p_resp->location = new_str_slice(*cursor, len - strlen("\r\n")); //< Saving position and length of field with location info
     }
 
     regex_t *con_type_r = &(regexes[CON_TYPE]);
     res[CON_TYPE] = regexec(con_type_r, *cursor, 1, &(matches[CON_TYPE]), 0);
-    if(res[CON_TYPE] != REG_NOMATCH) {
+    if(res[CON_TYPE] != REG_NOMATCH) { //< It is content-type header! (important for check of the MIME)
         *cursor =  skip_w_spaces(&((*cursor)[matches[CON_TYPE].rm_eo]));
         size_t len = (size_t)(line_end - *cursor);
         p_resp->content_type = new_str_slice(*cursor, len - strlen("\r\n"));
     }
-
-    regex_t *con_len_r = &(regexes[CON_LEN]);
-    res[CON_LEN] = regexec(con_len_r, *cursor, 1, &(matches[CON_LEN]), 0);
-    if(res[CON_LEN] != REG_NOMATCH) {
-        *cursor =  skip_w_spaces(&((*cursor)[matches[CON_LEN].rm_eo]));
-        size_t len = (size_t)(line_end - *cursor);
-        p_resp->content_len = new_str_slice(*cursor, len - strlen("\r\n"));
-    }
 }
 
 
+/**
+ * @brief Parses the first line of HTTP headers 
+ */
 int parse_first_line(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *url) {
     regex_t *regexes = ctx->regexes;
     regmatch_t *matches = ctx->regm;
     int *res = ctx->res;
     char **cursor = &(ctx->cursor);
 
-    res[VER] = regexec(&(regexes[VER]), *cursor, 1, &(matches[VER]), 0);
-    if(res[VER] != REG_NOMATCH) {
+    res[VER] = regexec(&(regexes[VER]), *cursor, 1, &(matches[VER]), 0); 
+    if(res[VER] != REG_NOMATCH) { //< Version field was found
         size_t version_len = matches[VER].rm_eo - matches[VER].rm_so;
-        p_resp->version = new_str_slice(*cursor, version_len);
+        p_resp->version = new_str_slice(*cursor, version_len); //< Saving version
         *cursor = &((*cursor)[matches[VER].rm_eo]);
     }
 
     *cursor = skip_w_spaces(*cursor);
     res[STAT] = regexec(&(regexes[STAT]), *cursor, 1, &(matches[STAT]), 0);
-    if(res[STAT] == REG_NOMATCH) {
+    if(res[STAT] == REG_NOMATCH) { //< The status field was found
         printerr(HTTP_ERROR, "Unable to find status code in reponse from '%s'!", *cursor);
         return HTTP_ERROR;
     }
@@ -498,7 +527,7 @@ int parse_first_line(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *url) {
 
     *cursor = skip_w_spaces(*cursor);
     res[PHR] = regexec(&(regexes[PHR]), *cursor, 1, &(matches[PHR]), 0);
-    if(res[PHR] == REG_NOMATCH) {
+    if(res[PHR] == REG_NOMATCH) { //< Phrase field was found
         printerr(HTTP_ERROR, "Unable to find status phrase in reponse from '%s'!", url);
         return HTTP_ERROR;
     }
@@ -511,6 +540,9 @@ int parse_first_line(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *url) {
 }
 
 
+/**
+ * @brief Parses the whole header setion of HTTP response 
+ */
 int parse_resp_headers(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *hdrs_start, char *url) {
     size_t line_no = 0;
 
@@ -540,7 +572,7 @@ int parse_resp_headers(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *hdrs_start
         *cursor = line_st = &((*cursor)[matches[LINE].rm_so]);
     }
 
-    if(line_no == 0 && ret == SUCCESS) {
+    if(line_no == 0 && ret == SUCCESS) { //Ther should be always at least initial line of headers
         printerr(HTTP_ERROR, "Invalid headers of HTTP response from '%s' (missing initial header)!", url);
         ret = HTTP_ERROR;
     }
@@ -574,6 +606,10 @@ int parse_http_resp(h_resp_t *parsed_resp, string_t *response, char *url) {
         parsed_resp->msg = &(resp[matches[H_PART].rm_eo]);
         ret = parse_resp_headers(&ctx, parsed_resp, response->str, url);
     }
+
+    #ifdef DEBUG
+        fprintf(stderr, "Length: st=%p len=%ld\n", parsed_resp->content_len.st, parsed_resp->content_len.len);
+    #endif
 
     free_all_patterns(regexes, RE_H_RESP_NUM);
 

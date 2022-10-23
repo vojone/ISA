@@ -41,9 +41,10 @@ MEMCHECK=0 # Default value of memcheck
 PASSED_MSG="[ \033[0;32mPASSED\033[0m ]"
 FAILED_MSG="[ \033[0;31mFAILED\033[0m ]"
 
+TEST_TO_BE_EXEC=""
 
 # Parse options
-while getopts "vmh" OPT
+while getopts "vmht:" OPT
 do
     if [ "$OPT" = "v" ]
     then
@@ -61,11 +62,15 @@ do
         echo -e "-m\tActivates memory checks (valgrind is needed)"
         echo -e "-v\tPreserves temporary files in test folders (for debugging)"
         echo -e "-h\tPrints help and ends program"
+        echo -e "-t test1\tRuns only test in 'test1' folder"
         echo
         echo "Return codes:"
         echo "0 - All tests passed"
         echo "1 - There are failed tests"
         exit 0
+    elif [ "$OPT" = "t" ]
+    then
+        TEST_TO_BE_EXEC=$OPTARG
     fi
 done
 
@@ -80,6 +85,11 @@ for TEST in $TEST_DIR
 do
     if [ -d $TEST ]
     then
+        if [[ "$TEST_TO_BE_EXEC" != "" &&  "$TEST_TO_BE_EXEC" != "${TEST#$TEST_DIR}" ]] 
+        then
+            continue
+        fi
+
         echo -e -n "${TEST#$TEST_DIR}:\t"
 
         if [ -f "$TEST/$TEST_FILE_NAME" ]

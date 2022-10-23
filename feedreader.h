@@ -22,3 +22,15 @@
 #include "url.h"
 
 
+/**
+ * @brief Wrapping structure for data that are necessary for analysis of the document 
+ * with feed
+ */
+typedef struct data_ctx {
+    char* doc_start; //< Ptr to start of the document with feed
+    int exp_type; //< Expected type of document
+    url_t *parsed_url; //< Analysed URL
+    char *url; //< Original URL
+} data_ctx_t;
+
+

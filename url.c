@@ -1,3 +1,11 @@
+/**
+ * @file url.c
+ * @brief Source file of url module
+ * 
+ * @author Vojtěch Dvořák (xdvora3o)
+ * @date 23. 10. 2022
+ */
+
 
 #include "url.h"
 
@@ -27,6 +35,9 @@ void url_dtor(url_t *url) {
 }
 
 
+/**
+ * @brief Initialization of array with result values for parsing URL
+ */
 void init_url_res_arr(int *res) {
     for(int i = 0; i < RE_URL_NUM; i++) {
         res[i] = REG_NOMATCH;
@@ -34,6 +45,9 @@ void init_url_res_arr(int *res) {
 }
 
 
+/**
+ * @brief Deallocation of regex structures
+ */
 void free_all_url_patterns(regex_t *regexes) {
     for(int i = 0; i < RE_URL_NUM; i++) {
         regfree(&(regexes[i]));
@@ -116,6 +130,7 @@ int is_path(bool *result, char *str) {
 }
 
 
+//Converts scheme to enum values (it is more program-friendly format)
 int get_src_type(char *scheme) {
     if(scheme == NULL) {
         scheme = DEFAULT_URL_SCHEME;
@@ -145,8 +160,8 @@ int prepare_url_patterns(regex_t *regexes) {
         "^((" IPV4ADDRESS ")|(\\[" IPV6ADDRESS "\\])|(" REGNAME "))",
         "^(:[0-9]*)",
         "^" PATH_ABS, //< Case in which is path empty is handled in normalize URL function
-        "^\\?(" UNRESERVED "|" SUBDELIMS "|[:@/?]|(" PCTENCODED "))*",
-        "^#(" UNRESERVED "|" SUBDELIMS "|[:@/?]|(" PCTENCODED "))*"
+        "^\\?(" P_CHAR "|[:@/?]|[^\\s#?/])*",
+        "^#(" P_CHAR "|[:@/?]|[^\\s#?/])*"
     };
     //End of part base on RFC3986
 
@@ -206,8 +221,76 @@ int res_url(bool is_inv, bool int_err, int *res, url_t *p_url, char *url) {
 }
 
 
+int ins_perc_encoded(string_t **dst, size_t index, char c) {
+    char tmp[4];
+
+    snprintf(tmp, 4, "%hhX", c);
+
+    rm_char(*dst, index);
+    
+    if(!ins_char(dst, index, '%') || 
+        !ins_char(dst, index + 1, tmp[0]) || 
+        !ins_char(dst, index + 2, tmp[1])) {
+        printerr(INTERNAL_ERROR, "Unable to convert character to percent form!");
+        return INTERNAL_ERROR;
+    }
+
+    return SUCCESS;
+}
+
+
+/**
+ * @brief Performs percent encoding of input (preserves characters/sequences allowed by pattern) 
+ * @note Tested mainly with UTF-8 (all inputs should be firstly converted to UTF-8 due to RFC3986)
+ */
+int perc_enc(string_t **src, const char *pattern) {
+    regex_t reg;
+    regmatch_t match;
+    int ret;
+
+    if(regcomp(&reg, pattern, REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
+        printerr(INTERNAL_ERROR, "Invalid compilation of regex! %d");
+        return INTERNAL_ERROR;
+    }
+
+    size_t match_end = 0;
+    while(match_end < strlen((*src)->str)) { //< If there are any unallowed characters (regex deos not match the entire string)
+        int res = regexec(&reg, (*src)->str, 1, &match, 0);
+        if(res == REG_NOMATCH) {
+            return SUCCESS;
+        }
+        else {
+            match_end = match.rm_eo;
+            if(match_end < strlen((*src)->str)) {
+                char cur_char = (*src)->str[match_end];
+                if((ret = ins_perc_encoded(src, match_end, cur_char)) != SUCCESS) {
+                    return ret;
+                }
+                
+                if((cur_char & 0xC0) == 0xC0) { //< UTF-8 multibyte
+                    for(int i = 3; ((cur_char = (*src)->str[match_end + i]) & 0xC0) == 0x80; i++) {
+                        if((ret = ins_perc_encoded(src, match_end + i, cur_char)) != SUCCESS) {
+                            return ret;
+                        }
+                        i+=2;
+                    }    
+                }
+            }
+        }
+    }
+
+    regfree(&reg);
+
+    return SUCCESS;
+}
+
+
+/**
+ * @brief Performs normalization of URL (addition of missing scheme, path, percent encoding...) 
+ */
 int normalize_url(url_t *p_url, char* def_scheme_part_str) {
     string_t **url_parts = p_url->url_parts, **dst;
+    int ret;
 
     if(p_url->type == FILE_SRC) { //< If it is file there is no need to normalization
         return SUCCESS;
@@ -248,6 +331,23 @@ int normalize_url(url_t *p_url, char* def_scheme_part_str) {
         if(!url_parts[PATH]) {
             printerr(INTERNAL_ERROR, "Unable to allocate buffer for path of URL!");
             return INTERNAL_ERROR;
+        }
+    }
+    else {
+        if((ret = perc_enc(&(url_parts[PATH]), PATH_ABS_STRICT)) != SUCCESS) { //< Due to RFCs - all characters that are not explicitly allowed should be percent encoded
+            return ret;
+        }
+    }
+
+    if(!is_empty(url_parts[QUERY])) {
+        if((ret = perc_enc(&(url_parts[QUERY]), QUERY_STRICT)) != SUCCESS) {
+            return ret;
+        }
+    }
+
+    if(!is_empty(url_parts[FRAG_PART])) {
+        if((ret = perc_enc(&(url_parts[FRAG_PART]), FRAG_STRICT)) != SUCCESS) {
+            return ret;
         }
     }
 

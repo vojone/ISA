@@ -3,7 +3,7 @@
  * @brief Source file with main function of feedreader program
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022
+ * @date 23. 10. 2022
  */
 
 #include "feedreader.h"
@@ -165,6 +165,9 @@ int parse_and_print(char *feed, int exp_type, settings_t *settings, char *url) {
 }
 
 
+/**
+ * @brief Reads feed from file in filesystem of localhost 
+ */
 int load_from_file(url_t *p_url, string_t *data_buff) {
     char *path = p_url->url_parts[PATH]->str;
     FILE *src = fopen(path, "r");
@@ -176,7 +179,7 @@ int load_from_file(url_t *p_url, string_t *data_buff) {
     size_t b_read = 0, newly_read_b = 1, empty_size = data_buff->size;
     size_t last_size = data_buff->size;
 
-    while(!feof(src)) {
+    while(!feof(src)) { //< Read until EOF is found
         char *mem_dest = &(data_buff->str[b_read]);
         newly_read_b = fread(mem_dest, sizeof(char), empty_size, src);
         if(newly_read_b == 0 && !feof(src)) {
@@ -186,7 +189,7 @@ int load_from_file(url_t *p_url, string_t *data_buff) {
 
         b_read += newly_read_b;
         empty_size -= newly_read_b;
-        if(empty_size == 0) {
+        if(empty_size == 0) { //< If there is no place for the new characters -> extend buffer
             if((data_buff = ext_string(data_buff)) == NULL) {
                 printerr(INTERNAL_ERROR, "Unable to extend buffer for data!");
                 fclose(src);
@@ -207,14 +210,17 @@ int load_from_file(url_t *p_url, string_t *data_buff) {
 }
 
 
+/**
+ * @brief Fetches data from various sources
+ */
 int load_data(url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
     switch(p_url->type) {
         case FILE_SRC:
             return load_from_file(p_url, data_buff);
         case HTTPS_SRC:
-            return https_connect(p_url, data_buff, url, s);
+            return https_load(p_url, data_buff, url, s);
         case HTTP_SRC:
-            return http_connect(p_url, data_buff, url);
+            return http_load(p_url, data_buff, url);
         default:
             printerr(URL_ERROR, "Unsupported type of source ('%s')!", url);
             return URL_ERROR;
@@ -222,14 +228,9 @@ int load_data(url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
 }
 
 
-typedef struct data_ctx {
-    char* doc_start;
-    int exp_type;
-    url_t *parsed_url;
-    char *url;
-} data_ctx_t;
-
-
+/**
+ * @brief 
+ */
 int parse_http_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
     h_resp_t parsed_resp;
     init_h_resp(&parsed_resp);
@@ -262,6 +263,9 @@ int parse_http_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
 }
 
 
+/**
+ * @brief Makes analysis of data that came from various sources 
+ */
 int parse_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
     int ret = SUCCESS;
 
@@ -269,11 +273,11 @@ int parse_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
     src_type_t src_type = ctx->parsed_url->type;
 
     switch(src_type) {
-        case HTTP_SRC:
+        case HTTP_SRC: //< HTTP protocol
         case HTTPS_SRC:
             ret = parse_http_data(ctx, current, data_buff);
             break;
-        case FILE_SRC:
+        case FILE_SRC: //< There is no wrapping protocol or something like that
             ctx->doc_start = data_buff->str;
             ctx->exp_type = XML;
             break;
@@ -377,6 +381,9 @@ int create_url_list(list_t *url_list, settings_t *settings) {
 }
 
 
+/**
+ * @brief Returns first non-SUCCESS return code from chain of processed URLs 
+ */
 int get_return_code(list_t *url_list) {
     int ret_code = SUCCESS;
     list_el_t *url = url_list->header;
@@ -403,6 +410,7 @@ int main(int argc, char **argv) {
     settings_t settings;
     init_settings(&settings);
 
+    //Prepare
     ret_code = parse_opts(argc, argv, &settings);
     if(ret_code != SUCCESS) {
         return ret_code;
@@ -419,15 +427,17 @@ int main(int argc, char **argv) {
     list_t url_list;
     list_init(&url_list);
 
-    if((ret_code = create_url_list(&url_list, &settings) != SUCCESS)) {
+    if((ret_code = create_url_list(&url_list, &settings)) != SUCCESS) {
         list_dtor(&url_list);
         return ret_code;
     }
 
+    //Main procedure
     xml_parser_init();
     ret_code = do_feedread(&url_list, &settings);
     xml_parser_cleanup();
 
+    //Get first invalid return code (if there is any)
     if(ret_code == SUCCESS) {
         ret_code = get_return_code(&url_list);
     }

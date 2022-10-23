@@ -4,7 +4,7 @@
  * RSS2/Atom feeds)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022 
+ * @date 23. 10. 2022 
  */
 
 #include "feed.h"
@@ -165,7 +165,12 @@ int parse_atom_entry(feed_el_t *cur_feed, xmlNodePtr entry) {
             ret = set_feed_field(&(cur_feed->updated), content, "updated");
         }
         else if(hasName(child, "link")) {
-            ret = set_feed_field(&(cur_feed->url), content, "link");
+            xmlChar *link = xmlGetProp(child, (xmlChar *)"href");
+            if(link) {
+                ret = set_feed_field(&(cur_feed->url), link, "link");
+            }
+            
+            if(content) xmlFree(content);
         }
         else if(hasName(child, "author")) { //< Go inside author tag (there can be name and email)
             ret = parse_atom_author(child, cur_feed);
@@ -407,10 +412,10 @@ void print_feed_doc(feed_doc_t *feed_doc, settings_t *settings) {
             printf("Updated: %s\n", feed->updated);
         }
 
-        if(settings->author_flag || 
+        if(settings->author_flag ||  //< There is newline only if there are any additional information flag
             settings->asoc_url_flag || 
             settings->time_flag) {
-            printf("\n");
+            printf("\n"); 
         }
 
         feed = feed->next;

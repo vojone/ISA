@@ -18,6 +18,8 @@
 #include <string.h>
 
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -46,10 +48,8 @@ enum re_h_resp_indexes {
     PHR,
     LOC,
     CON_TYPE,
-    CON_LEN,
     RE_H_RESP_NUM, //< Maximum amount of tokens in URL 
 };
-
 
 #define CHECK_MIME_TYPE
 
@@ -71,28 +71,88 @@ typedef struct h_resp {
 } h_resp_t;
 
 
+
+/**
+ * @brief Wrapping structure for parsing context of HTTP response 
+ * @note Just for internal usage (inside module)
+ */
+typedef struct resp_parse_ctx {
+    regex_t regexes[RE_H_RESP_NUM];
+    char *cursor;
+    regmatch_t regm[RE_H_RESP_NUM];
+    int res[RE_H_RESP_NUM];
+} resp_parse_ctx_t;
+
+
+/**
+ * @brief Initialization of OpenSSL library (necessary for HTTPS) 
+ */
 void openssl_init();
 
+
+/**
+ * @brief Teardown of OpenSSL library 
+ */
 void openssl_cleanup();
 
+
+/**
+ * @brief Sends HTTP request to server with given analyzed URL
+ */
 int send_request(BIO *bio, url_t *p_url, char *url);
 
+
+/**
+ * @brief Fetching reponse from HTTP server
+ */
 int rec_response(BIO *bio, string_t *resp_b, char *url);
 
-int https_connect(url_t *p_url, string_t *resp_b, char *url, settings_t *s);
 
-int http_connect(url_t *parsed_url, string_t *resp_b, char *url);
+/**
+ * @brief Provides sending request, verification and fetching data for HTTPS 
+ */
+int https_load(url_t *p_url, string_t *resp_b, char *url, settings_t *s);
 
+
+/**
+ * @brief Provides sending request and fetching data for HTTP
+ */
+int http_load(url_t *parsed_url, string_t *resp_b, char *url);
+
+
+/**
+ * @brief Checks if status of HTTP response has code 2xx 
+ */
 int check_http_status(int status_c, string_t *phrase, char *url);
 
+
+/**
+ * @brief Performs HTTP redirection
+ */
 int http_redirect(h_resp_t *p_resp, list_el_t *cur_url);
 
+
+/**
+ * @brief Checks the validity of HTTP response
+ */
 int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url);
 
+
+/**
+ * @brief Analyses HTTP response
+ */
 int parse_http_resp(h_resp_t *parsed_resp, string_t *response, char *url);
 
+
+/**
+ * @brief Initializes structure for result of response parsing
+ */
 void init_h_resp(h_resp_t *h_resp);
 
+
+/**
+ * @brief Performs the reset of h_resp_t structure 
+ */
 void erase_h_resp(h_resp_t *h_resp);
 
 #endif

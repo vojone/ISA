@@ -1,3 +1,12 @@
+/**
+ * @file url.h
+ * @brief Header file of url module
+ * 
+ * @author Vojtěch Dvořák (xdvora3o)
+ * @date 23. 10. 2022
+ */
+
+
 #ifndef _FEEDREADER_URL_
 #define _FEEDREADER_URL_
 
@@ -12,15 +21,16 @@
 #include "cli.h"
 
 
-#define DEFAULT_URL_SCHEME "https://"
+#define DEFAULT_URL_SCHEME "https://" //< Default scheme (it is added to URL if user provides URL without any scheme)
 
+//Regex macros for parsing URL
 //Based on RFC3986
 #define HEXDIG "[0-9a-f]"
 #define H16 HEXDIG "{1,4}"
 #define LS32 "(" H16 ":" H16 ")|" IPV4ADDRESS
 
-#define UNRESERVED "[a-z0-9\\._~\\-]"
-#define SUBDELIMS "[@!\\$&'()*+,;=]"
+#define UNRESERVED "[a-z0-9._~-]"
+#define SUBDELIMS "[@!$&'()*+,;=]"
 #define PCTENCODED "%" HEXDIG HEXDIG
 #define DECOCTED "[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-5]{2}"
 #define IPV4ADDRESS DECOCTED "\\." DECOCTED "\\." DECOCTED "\\." DECOCTED
@@ -37,11 +47,17 @@
 #define REGNAME "((" UNRESERVED ")|(" SUBDELIMS ")|(" PCTENCODED "))+"
 
 #define P_CHAR "(" UNRESERVED "|" SUBDELIMS "|[:@]|(" PCTENCODED "))"
-#define PATH_ABS "(/(" P_CHAR ")*)+"
-#define PATH_NO_SCH "(" UNRESERVED "|" SUBDELIMS "|[@]|(" PCTENCODED "))+\
-(/(" P_CHAR ")*)*"
 
-#define PATH_ROOTLESS "(" P_CHAR ")+(/(" P_CHAR ")*)*"
+//Auxiliary regexes for percent encoding
+#define PATH_ABS_STRICT "^(/(" P_CHAR ")*)+"
+#define QUERY_STRICT "^\\?(" P_CHAR "|[:@/?])*"
+#define FRAG_STRICT "^#(" P_CHAR "|[:@/?])*"
+
+#define PATH_ABS "(/(" P_CHAR "|[^\\s#?/])*)+"
+#define PATH_NO_SCH "(" UNRESERVED "|" SUBDELIMS "|[@]|(" PCTENCODED ")|[^\\s#?/])+\
+(/(" P_CHAR "|[^\\s#?/])*)*"
+
+#define PATH_ROOTLESS "(" P_CHAR "|[^\\s#?/])+(/(" P_CHAR "|[^\\s#?/])*)*"
 //End of part based on RFC3986
 
 
@@ -58,6 +74,9 @@ enum re_url_indexes {
 };
 
 
+/**
+ * @brief Indexes for path regexes 
+ */
 enum re_path_indexes {
     ABS,
     NO_SCHEME,
@@ -72,20 +91,43 @@ enum re_path_indexes {
  */
 typedef struct url {
     string_t *url_parts[RE_URL_NUM];
-    src_type_t type;
+    src_type_t type; //< Type of source (ATOM/RSS/XML)
 } url_t;
 
 
+/**
+ * @brief Initialization of URL structure 
+ */
 void init_url(url_t *url);
 
+
+/**
+ * @brief Deallocation of URL structure 
+ */
 void url_dtor(url_t *url);
 
+
+/**
+ * @brief Replaces path in given original URL
+ */
 string_t *replace_path(string_t *orig_url, string_t *path);
 
+
+/**
+ * @brief Determines wheter given string is path (absolute or relative) 
+ */
 int is_path(bool *result, char *str);
 
+
+/**
+ * @brief Re-initialization of given URL 
+ */
 void erase_url(url_t *url);
 
+
+/**
+ * @brief Analysis of URL 
+ */
 int parse_url(char *url, url_t *parsed_url);
 
 

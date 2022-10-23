@@ -8,7 +8,7 @@ HEADERS = $(APP_NAME).h common.h cli.h http.h feed.h url.h
 # Compiling
 CC = gcc
 LDLIBS = -lssl -lcrypto
-CFLAGS = -std=c99 -Wall -Wextra -pedantic
+CFLAGS = -std=c11 -Wall -Wextra -pedantic
 
 # Adding libraries and
 CFLAGS := $(CFLAGS) `xml2-config --cflags`
@@ -35,7 +35,7 @@ debug: CFLAGS := $(CFLAGS) -g
 debug: feedreader
 
 
-test:
+test: $(APP_NAME)
 	./$(TEST_SCRIPT_NAME)
 
 tar:

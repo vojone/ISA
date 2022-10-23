@@ -5,7 +5,7 @@
  * there are also internal functions/structures in cli.c file)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022
+ * @date 23. 10. 2022
  */
 
 
@@ -54,6 +54,18 @@ typedef struct settings {
     char *certfile, *certaddr;
     bool time_flag, author_flag, asoc_url_flag, help_flag; //< Options without arguments
 } settings_t;
+
+
+/**
+ * @brief Auxiliary structure to avoid too many parameters of option parsing 
+ * functions
+ * @note Just for internal usage
+ */
+typedef struct opt {
+    char *name; //< Pointer to the name of option (usefull expecially for error messages)
+    bool *flag; //< Pointer to the variable, that signalizes that option is ON
+    char **arg; //< Pointer to the pointer to the argument of specific option
+} opt_t;
 
 
 void init_settings(settings_t *settings);

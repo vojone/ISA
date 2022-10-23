@@ -1,0 +1,2 @@
+#Valid RSS from file
+file://`realpath rssfile`

@@ -1,0 +1,2 @@
+#Valid ATOM from file with options
+file://`realpath atomfile` -T -u -a

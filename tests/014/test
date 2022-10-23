@@ -1,0 +1,2 @@
+#Valid RSS from file with options
+file://`realpath rssfile` -Tua

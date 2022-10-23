@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+
+<channel>
+    <title>RSS document</title>
+    <item>
+        <title>RSS item 1</title>
+        <author>example@google.com (Vojtech Dvorak)</author>
+        <link>www.google.com</link>
+        <description>asdfasdfaasdf</description>
+    </item>
+    <item>
+        <link>www.google.com</link>
+        <title>RSS item 2</title>
+        <description>asdfasdfaasdf</description>
+        <author>example@google.com (Vojtech Dvorak)</author>
+    </item>
+    <item>
+        <title>RSS item 3</title>
+        <author>example@google.com (Vojtech Dvorak)</author>
+        <description>asdfasdfaasdf</description>
+        <link>www.google.com</link>
+    </item>
+</channel>
+</rss> 

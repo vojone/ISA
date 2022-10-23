@@ -4,7 +4,7 @@
  * across the project (mostly suited for ADT declared in .h)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022
+ * @date 23. 10. 2022
  */
 
 #include "common.h"
@@ -202,6 +202,28 @@ void trunc_string(string_t *string, int n) {
 }
 
 
+void trunc_str(char *str, int n) {
+    size_t str_len = strlen(str);
+    int trunc_n = ABS(n) > str_len ? str_len : ABS(n); //< Limit the truncation to the size of the string
+
+    if(n > 0) { //< + means from start
+        for(int i = 0; (unsigned)(trunc_n + i) < str_len; i++) {
+            str[i] = str[trunc_n + i]; //< Move characters to beginning to remove characters at the begining 
+        }
+    }
+    else { //< - means from the end
+        char *str_end;
+        for(int i = 1; (signed)(str_len - i) > 0; i++) {
+            if(*(str_end = &(str[str_len - i])) == '\0') {
+                break;
+            }
+        }
+    
+        memset(&(str_end[str_len - trunc_n]), 0, trunc_n); //< Remove characters from the end (replace them by '\0')
+    }
+}
+
+
 void string_to_lower(string_t *string) {
     for(size_t i = 0; i < string->size; i++) {
         string->str[i] = tolower(string->str[i]);
@@ -219,6 +241,37 @@ string_t *app_char(string_t **dest, char c) {
     (*dest)->str[strlen((*dest)->str)] = c;
 
     return *dest; //< Return pointer to the (reallocated) string
+}
+
+
+void rm_char(string_t *dest, size_t index) {
+    if(index >= strlen(dest->str)) {
+        return;
+    }
+    else {
+        size_t rest_len = dest->size - index - 1;
+        memmove(&(dest->str[index]), &(dest->str[index + 1]), rest_len);
+    }
+}
+
+
+string_t *ins_char(string_t **dest, size_t index, char c) {
+    if(index > strlen((*dest)->str)) {
+        return *dest;
+    }
+    else {
+        if(strlen((*dest)->str) >= (*dest)->size - 1) {
+            if(!(*dest = ext_string(*dest))) { //< Extend string if necessary
+                return NULL;
+            }    
+        }
+
+        size_t rest_len = (*dest)->size - index - 1;
+        memmove(&((*dest)->str[index + 1]), &((*dest)->str[index]), rest_len);
+        (*dest)->str[index] = c;
+    }
+
+    return *dest;
 }
 
 

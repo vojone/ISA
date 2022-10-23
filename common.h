@@ -4,7 +4,7 @@
  * exported functions and structures (ADT)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022
+ * @date 23. 10. 2022
  */
 
 #ifndef _FEEDREADER_COMMON_
@@ -157,6 +157,10 @@ bool is_line_empty(char *line_start_ptr);
 list_el_t *new_element(char *str_content);
 
 
+/**
+ * @brief Creates new element with pointer to given string (there is no 
+ * allocation of memory for the new string) 
+ */
 list_el_t *new_element_non_dup(string_t *content, size_t indirection_lvl);
 
 
@@ -225,6 +229,15 @@ void erase_string(string_t *string);
 void trunc_string(string_t *string, int n);
 
 
+/**
+ * @brief Cuts the end/start of c string (null terminated string of bytes) 
+ */
+void trunc_str(char *str, int n);
+
+
+/**
+ * @brief Converts all alphabetic (ASCII) characters to lower case 
+ */
 void string_to_lower(string_t *string);
 
 
@@ -240,6 +253,21 @@ void string_to_lower(string_t *string);
 string_t *app_char(string_t **dest, char c);
 
 
+/**
+ * @brief Removes character at given index 
+ */
+void rm_char(string_t *dest, size_t index);
+
+
+/**
+ * @brief Inserts new character c to the given index 
+ */
+string_t *ins_char(string_t **dest, size_t index, char c);
+
+
+/**
+ * @brief Appends string to the end of another string 
+ */
 string_t *app_string(string_t **dest, char *src);
 
 

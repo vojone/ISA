@@ -1,0 +1,2 @@
+#Specified both feedfile and URL
+-f "feedfile" google.com
