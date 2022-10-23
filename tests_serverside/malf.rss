@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!-- Malformed RSS2.0 file -->
+
+<rss version="2.0">
+
+<channl>
+  <title>ISA testing channel</title>
+  <link>https://www.test.com</link>
+  <description>Test RSS file for ISA project</description>
+  <item>
+    <title>RSS item 1</title>
+    <link>https://www.isa-is-the-best.info</link>
+    <author>xdvora@fit.vutbr.cz</author>
+    <pubDate>Yesterday</pubDate>
+  </item>
+  <item>
+    <link>https://www.isa-is-the-best.info</link>
+    <title>RSS item 2</title>

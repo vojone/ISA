@@ -12,6 +12,8 @@ Reader of news in Atom/RSS2.0 format with TLS support. Reads XML documents speci
 ## Structure of project
 - `tests` - folder with test cases 
 
+- `tests_serverside` - folder with documents, that are places on HTTP server: `http://www.stud.fit.vutbr.cz`, that provides stub for some "online" tests (this source static in contrast with real feed sources)
+
 - `cli.h, cli.c` - CLI module, performs communication with user
 
 - `common.h, common.c` - module with auxiliary functions used across the project (e. g. dynamic string)

@@ -1,0 +1,2 @@
+#Reading RSS2.0 with other info
+./feedreader "https://www.stud.fit.vutbr.cz/~xdvora3o/ISA/tests_serverside/reg1" -Tua

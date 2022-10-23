@@ -43,3 +43,4 @@ tar:
 
 clean:
 	rm -f $(APP_NAME) $(ARCHIVE_NAME)
+	

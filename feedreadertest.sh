@@ -80,104 +80,131 @@ TOTAL_NUM=0
 date
 echo "Running tests of feedreader:"
 
+
+function test_exec() {
+    echo "$1:"
+
+    for TEST in $1
+    do
+        if [ -d "$TEST" ]
+        then
+            if [ -f "$TEST/$TEST_FILE_NAME" ]
+            then
+                if [[ "$TEST_TO_BE_EXEC" != "" &&  "$TEST_TO_BE_EXEC" != "${TEST#$1}" ]] 
+                then
+                    continue
+                fi
+
+                echo -e -n "${TEST#$1}:\t"
+
+                HEAD_LINES=`head -2 "$TEST/$TEST_FILE_NAME"`
+
+                INIT_LINE=`echo "$HEAD_LINES" | head -1`
+                ARGS=$INIT_LINE # Arguments for program in this test case
+
+                if [[ "${INIT_LINE:0:1}" == "#" ]]
+                then
+                    DESCRIPTION=`echo "${INIT_LINE:1:60}" | xargs` # Remove # from start and trim string
+                    ARGS=`echo "$HEAD_LINES" | tail -1` # Line with test command is second line of test file
+                else
+                    DESCRIPTION=""
+                fi
+
+                ERROR_FILE=$ERROR_FILE_NAME
+                RESULT_FILE=$RESULT_FILE_NAME
+                PROGRAM_REALPATH=$(realpath ${PROGRAM_PATH})
+                cd $TEST # Go to Directory with current test
+
+                if [ $MEMCHECK == 1 ] # Testing
+                then
+                    eval "valgrind --leak-check=full --log-file=\"${VALGRIND_LOG_FILE_NAME}\" ${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
+                else
+                    eval "${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
+                fi
+                RETURN_CODE=$?
+                
+                REASON=""
+                RESULT=$PASSED_MSG
+                if [ -f "$RET_CODE_FILE_NAME" ]
+                then
+                    read EXPECTED_RETURN_CODE < "$RET_CODE_FILE_NAME"
+
+                    if [ $EXPECTED_RETURN_CODE != $RETURN_CODE ]
+                    then
+                        REASON="${REASON}Return code mismatch, Expected: $EXPECTED_RETURN_CODE Got: $RETURN_CODE\n"
+                        RESULT=$FAILED_MSG
+                    fi
+                fi
+
+                if [ -f "$OUTPUT_FILE_NAME" ]
+                then
+                    diff $RESULT_FILE $OUTPUT_FILE_NAME > $DIFF_FILE_NAME
+                    if [ $? != 0 ]
+                    then
+                        REASON="${REASON}Different outputs! (use -v to preserve $RESULT_FILE_NAME file)\n"
+                        RESULT=$FAILED_MSG
+                    fi
+                fi
+
+                if [ $MEMCHECK == 1 ]
+                then
+                    VALGRIND_LOG_TAIL=`cat ${VALGRIND_LOG_FILE_NAME} | tail -1`
+                    VALGRIND_ERROR_SUM=`echo -n ${VALGRIND_LOG_TAIL} | grep "ERROR SUMMARY: [1-9][0-9]*" -`
+                    if [[ $VALGRIND_ERROR_SUM != "" ]]
+                    then
+                        REASON="${REASON}${VALGRIND_LOG_TAIL}\n"
+                        RESULT=$FAILED_MSG
+                    fi
+                fi
+
+                if [ $VERBOSE != 1 ] # Remove temporary files
+                then
+                    rm -f $ERROR_FILE $RESULT_FILE $DIFF_FILE_NAME $VALGRIND_LOG_FILE_NAME
+                fi
+
+                echo -e "$RESULT\t$DESCRIPTION"
+                if [[ "$REASON" != "" ]]
+                then
+                    echo -e -n "Why: \t$REASON"
+                fi
+
+                if [[ "$RESULT" != "$FAILED_MSG" ]]
+                then
+                    PASSED_NUM=$(expr $PASSED_NUM + 1)
+                fi
+
+                TOTAL_NUM=$(expr $TOTAL_NUM + 1)
+
+                cd $RETURN_PATH # Return to default directory
+            else
+                FOUND_SUBFOLDER=0
+                for SUB_FOLDER in "$TEST/*"
+                do
+                    if [ -d $SUB_FOLDER ]
+                    then
+                        test_exec "$TEST/*"
+                        FOUND_SUBFOLDER=1 
+                    fi
+                done
+
+                if [ $FOUND_SUBFOLDER == 0 ]
+                then
+                    if [[ "$TEST_TO_BE_EXEC" != "" &&  "$TEST_TO_BE_EXEC" != "${TEST#$1}" ]] 
+                    then
+                        continue
+                    fi
+
+                    echo -e -n "${TEST#$1}:\t"
+                    echo -e "\033[0;33mMandatory '$TEST_FILE_NAME' file in the test directory '$TEST' was not found!\033[0m"
+                fi
+            fi
+        fi
+    done 
+}
+
+
 RETURN_PATH=$(realpath .)
-for TEST in $TEST_DIR
-do
-    if [ -d $TEST ]
-    then
-        if [[ "$TEST_TO_BE_EXEC" != "" &&  "$TEST_TO_BE_EXEC" != "${TEST#$TEST_DIR}" ]] 
-        then
-            continue
-        fi
-
-        echo -e -n "${TEST#$TEST_DIR}:\t"
-
-        if [ -f "$TEST/$TEST_FILE_NAME" ]
-        then
-            HEAD_LINES=`head -2 "$TEST/$TEST_FILE_NAME"`
-
-            INIT_LINE=`echo "$HEAD_LINES" | head -1`
-            ARGS=$INIT_LINE # Arguments for program in this test case
-
-            if [[ "${INIT_LINE:0:1}" == "#" ]]
-            then
-                DESCRIPTION=`echo "${INIT_LINE:1:60}" | xargs` # Remove # from start and trim string
-                ARGS=`echo "$HEAD_LINES" | tail -1` # Line with test command is second line of test file
-            else
-                DESCRIPTION=""
-            fi
-
-            ERROR_FILE=$ERROR_FILE_NAME
-            RESULT_FILE=$RESULT_FILE_NAME
-            PROGRAM_REALPATH=$(realpath ${PROGRAM_PATH})
-            cd $TEST # Go to Directory with current test
-
-            if [ $MEMCHECK == 1 ] # Testing
-            then
-                eval "valgrind --leak-check=full --log-file=\"${VALGRIND_LOG_FILE_NAME}\" ${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
-            else
-                eval "${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
-            fi
-            RETURN_CODE=$?
-            
-            REASON=""
-            RESULT=$PASSED_MSG
-            if [ -f "$RET_CODE_FILE_NAME" ]
-            then
-                read EXPECTED_RETURN_CODE < "$RET_CODE_FILE_NAME"
-
-                if [ $EXPECTED_RETURN_CODE != $RETURN_CODE ]
-                then
-                    REASON="${REASON}Return code mismatch, Expected: $EXPECTED_RETURN_CODE Got: $RETURN_CODE\n"
-                    RESULT=$FAILED_MSG
-                fi
-            fi
-
-            if [ -f "$OUTPUT_FILE_NAME" ]
-            then
-                diff $RESULT_FILE $OUTPUT_FILE_NAME > $DIFF_FILE_NAME
-                if [ $? != 0 ]
-                then
-                    REASON="${REASON}Different outputs! (use -v to preserve $RESULT_FILE_NAME file)\n"
-                    RESULT=$FAILED_MSG
-                fi
-            fi
-
-            if [ $MEMCHECK == 1 ]
-            then
-                VALGRIND_LOG_TAIL=`cat ${VALGRIND_LOG_FILE_NAME} | tail -1`
-                VALGRIND_ERROR_SUM=`echo -n ${VALGRIND_LOG_TAIL} | grep "ERROR SUMMARY: [1-9][0-9]*" -`
-                if [[ $VALGRIND_ERROR_SUM != "" ]]
-                then
-                    REASON="${REASON}${VALGRIND_LOG_TAIL}\n"
-                    RESULT=$FAILED_MSG
-                fi
-            fi
-
-            if [ $VERBOSE != 1 ] # Remove temporary files
-            then
-                rm -f $ERROR_FILE $RESULT_FILE $DIFF_FILE_NAME $VALGRIND_LOG_FILE_NAME
-            fi
-
-            echo -e "$RESULT\t$DESCRIPTION"
-            if [[ "$REASON" != "" ]]
-            then
-                echo -e -n "Why: \t$REASON"
-            fi
-
-            if [[ "$RESULT" != "$FAILED_MSG" ]]
-            then
-                PASSED_NUM=$(expr $PASSED_NUM + 1)
-            fi
-
-            TOTAL_NUM=$(expr $TOTAL_NUM + 1)
-
-            cd $RETURN_PATH # Return to default directory
-        else
-            echo -e "\033[0;33mMandatory '$TEST_FILE_NAME' file in the test directory '$TEST' was not found!\033[0m"
-        fi
-    fi
-done 
+test_exec "$TEST_DIR"
 
 
 echo "Summary: ${PASSED_NUM}/${TOTAL_NUM} tests passed"
