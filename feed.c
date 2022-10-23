@@ -398,11 +398,11 @@ bool is_known(xmlChar *field) {
 
 void print_feed_doc(feed_doc_t *feed_doc, settings_t *settings) {
     
-    printf("*** %s ***\n", is_known(feed_doc->src_name) ? (char *)feed_doc->src_name : "<unnamed source>");
+    printf("*** %s ***\n", is_known(feed_doc->src_name) ? (char *)feed_doc->src_name : "<neznamy zdroj>");
 
     feed_el_t *feed = feed_doc->feed;
     while(feed) {
-        printf("%s\n", is_known(feed->title) ? (char*)feed->title : "<unnamed item>");
+        printf("%s\n", is_known(feed->title) ? (char*)feed->title : "<nepojmenovany prispevek>");
 
         if(is_known(feed->auth_name) && settings->author_flag) {
             printf("Autor: %s\n", feed->auth_name);
