@@ -23,7 +23,7 @@
 
 #define CLI_WARNINGS //< Comment to turn off warnings
 
-#define DEBUG //< Uncomment to allow debugging prints to stderr
+//#define DEBUG //< Uncomment to allow debugging prints to stderr
 
 /**
  * @brief Error codes, that can be returned by program

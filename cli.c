@@ -68,7 +68,7 @@ void print_usage() {
 
 void print_help() {
     const char *about_msg = 
-        "Reader of new in Atom/RSS from given URL\n";
+        "Reader of news in Atom/RSS2.0\n";
 
     const char *option_msg = 
         "options:\n"

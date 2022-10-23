@@ -403,13 +403,13 @@ void print_feed_doc(feed_doc_t *feed_doc, settings_t *settings) {
         printf("%s\n", is_known(feed->title) ? (char*)feed->title : "<unnamed item>");
 
         if(is_known(feed->auth_name) && settings->author_flag) {
-            printf("Author: %s\n", feed->auth_name);
+            printf("Autor: %s\n", feed->auth_name);
         }
         if(is_known(feed->url) && settings->asoc_url_flag) {
             printf("URL: %s\n", feed->url);
         }
         if(is_known(feed->updated) && settings->time_flag) {
-            printf("Updated: %s\n", feed->updated);
+            printf("Aktualizace: %s\n", feed->updated);
         }
 
         if(settings->author_flag ||  //< There is newline only if there are any additional information flag
