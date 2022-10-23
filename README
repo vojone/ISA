@@ -121,17 +121,22 @@ Output (output may differ due to current feed):
 *** Reuters home page ***
 Dow posts record closing high, stocks gain for 3rd week; dollar dips
 URL: https://www.reuters.com/business/global-markets-wrapup-7-graphics-2021-10-22/
-Updated: Sat, 23 Oct 2021 00:53:12 +0000
+Aktualizace: Sat, 23 Oct 2021 00:53:12 +0000
 
 Prop guns spark debate after cinematographer's death on set
 URL: https://www.reuters.com/world/us/prop-guns-spark-debate-after-cinematographers-death-set-2021-10-22/
-Updated: Sat, 23 Oct 2021 00:19:06 +0000
+Aktualizace: Sat, 23 Oct 2021 00:19:06 +0000
+
+White House repeats no Taiwan policy change; experts see Biden gaffe
+URL: https://www.reuters.com/world/china/white-house-repeats-no-taiwan-policy-change-experts-see-biden-gaffe-2021-10-22/
+Aktualizace: Sat, 23 Oct 2021 00:19:06 +0000
 
 ...
 
 Viral video, opinions challenge Georgia jury selection for Arbery case
 URL: https://www.reuters.com/world/us/viral-video-opinions-challenge-georgia-jury-selection-arbery-case-2021-10-22/
-Updated: Fri, 22 Oct 2021 17:20:09 +0000
+Aktualizace: Fri, 22 Oct 2021 17:20:09 +0000
+
 
 ```
 
@@ -146,7 +151,7 @@ Feedfile:
 #Atom source
 https://xkcd.com/atom.xml
 #RSS sources
-https://rss.acast.com/unraveled
+https://feeds.acast.com/public/shows/5ea17537-f11f-4532-8202-294d976b9d5c
 https://rss.art19.com/apology-line
 
 ```
