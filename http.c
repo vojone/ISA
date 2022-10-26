@@ -281,8 +281,6 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
         return HTTP_ERROR;
     }
     else if(p_resp->location.st != NULL) {
-        size_t lvl = cur_url->indirect_lvl + 1; //< Increase redirection lvl (for safety)
-
         string_t *location = slice2string(&(p_resp->location));
         if(!location) {
             printerr(INTERNAL_ERROR, "Unable to allocate memory for new URL!");
@@ -301,13 +299,15 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
             location = tmp;
         }
 
-        list_el_t *new_element = new_element_non_dup(location, lvl); //< Create new element for linked list with URLs
+        list_el_t *new_element = new_element_non_dup(location); //< Create new element for linked list with URLs
         if(!new_element) {
             printerr(INTERNAL_ERROR, "Unable to create new URL for redirect from '%s'!", cur_url->string->str);
             return INTERNAL_ERROR;
         }
 
-        new_element->next = cur_url->next;
+        new_element->result = SUCCESS;
+        new_element->indirect_lvl = cur_url->indirect_lvl + 1; //< Increase redirection lvl (for safety reason)
+        new_element->next = cur_url->next; //< Adding new element (URL) after curretnly processed URL
         cur_url->next = new_element;
     }
     else {

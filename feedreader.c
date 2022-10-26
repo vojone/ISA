@@ -10,6 +10,31 @@
 
 
 /**
+ * @brief Auxiliary function, that moves string buffer to linked list as a 
+ * new element
+ * 
+ * @param buffer Buffer its value should be copied to the element of list
+ * @param dst_list Target list
+ * @return int SUCCESS if moving went OK
+ */
+int move_to_list(string_t *buffer, list_t *dst_list) {
+    list_el_t *new_url = new_element(buffer->str);
+    if(!new_url) {
+        printerr(INTERNAL_ERROR, "Unable to move '%s' to the list!", buffer->str);
+        return INTERNAL_ERROR;
+    }
+
+    new_url->result = SUCCESS;
+    new_url->indirect_lvl = 0; //< It is original URL
+
+    list_append(dst_list, new_url);
+
+    return SUCCESS;
+}
+
+
+
+/**
  * @brief Checks if given configuration of settings is valid and eventually prints error msg
  * 
  * @param settings Configuration to be checked
@@ -29,7 +54,6 @@ int validate_settings(settings_t *settings) {
 
     return SUCCESS;
 }
-
 
 
 /**
@@ -372,6 +396,7 @@ int create_url_list(list_t *url_list, settings_t *settings) {
             ret_code = INTERNAL_ERROR;
         }
         else {
+            first->result = SUCCESS;
             first->indirect_lvl = 0; //< It is original URL
             list_append(url_list, first);
         }

@@ -80,14 +80,14 @@ list_el_t *new_element(char *str_content) {
 
     //Initialization
     new->indirect_lvl = 0;
-    new->result = SUCCESS;
+    new->result = 0;
     new->next = NULL;
 
     return new;
 }
 
 
-list_el_t *new_element_non_dup(string_t *content, size_t indirection_lvl) {
+list_el_t *new_element_non_dup(string_t *content) {
     list_el_t *new = (list_el_t *)malloc(sizeof(list_el_t));
     if(!new) { //< Allocation error
         return NULL;
@@ -96,8 +96,8 @@ list_el_t *new_element_non_dup(string_t *content, size_t indirection_lvl) {
     new->string = content;
 
     //Initialization
-    new->indirect_lvl = indirection_lvl;
-    new->result = SUCCESS;
+    new->indirect_lvl = 0;
+    new->result = 0;
     new->next = NULL;
 
     return new;
@@ -159,21 +159,6 @@ void list_append(list_t *list, list_el_t *new_element) {
     };
 
     current->next = new_element;
-}
-
-
-int move_to_list(string_t *buffer, list_t *dst_list) {
-    list_el_t *new_url = new_element(buffer->str);
-    if(!new_url) {
-        printerr(INTERNAL_ERROR, "Unable to move '%s' to the list!", buffer->str);
-        return INTERNAL_ERROR;
-    }
-
-    new_url->indirect_lvl = 0; //< It is original URL
-
-    list_append(dst_list, new_url);
-
-    return SUCCESS;
 }
 
 

@@ -18,7 +18,6 @@
 
 #include <sys/types.h>
 
-#include "cli.h"
 
 #define INIT_STRING_SIZE 32 //< Default initial size of strings (that are used as buffer)
 #define INIT_NET_BUFF_SIZE 16384 //< Must be big enough for request (at least strlen(req_pattern) + strlen(host) + strlen(path) + strlen("\0"))
@@ -161,7 +160,7 @@ list_el_t *new_element(char *str_content);
  * @brief Creates new element with pointer to given string (there is no 
  * allocation of memory for the new string) 
  */
-list_el_t *new_element_non_dup(string_t *content, size_t indirection_lvl);
+list_el_t *new_element_non_dup(string_t *content);
 
 
 /**
@@ -197,16 +196,6 @@ void list_dtor(list_t *list);
  * @param new_element Element to be added to the end of the list
  */
 void list_append(list_t *list, list_el_t *new_element);
-
-
-/**
- * @brief Moves string buffer to linked list as a new element
- * 
- * @param buffer Buffer its value should be copied to the element of list
- * @param dst_list Target list
- * @return int SUCCESS if moving went OK
- */
-int move_to_list(string_t *buffer, list_t *dst_list);
 
 
 /**
