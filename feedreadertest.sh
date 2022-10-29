@@ -84,12 +84,15 @@ echo "Running tests of feedreader:"
 function test_exec() {
     echo "$1:"
 
+    VALID_FOLDER=0
     for TEST in $1
     do
         if [ -d "$TEST" ]
         then
             if [ -f "$TEST/$TEST_FILE_NAME" ]
             then
+                VALID_FOLDER=1
+
                 if [[ "$TEST_TO_BE_EXEC" != "" &&  "$TEST_TO_BE_EXEC" != "${TEST#$1}" ]] 
                 then
                     continue
@@ -176,30 +179,42 @@ function test_exec() {
                 TOTAL_NUM=$(expr $TOTAL_NUM + 1)
 
                 cd $RETURN_PATH # Return to default directory
-            else
-                FOUND_SUBFOLDER=0
-                for SUB_FOLDER in "$TEST/*"
+            fi
+        fi
+    done 
+
+    for TEST in $1
+    do
+        if [ -d "$TEST" ]
+        then
+            if [ ! -f "$TEST/$TEST_FILE_NAME" ]
+            then
+                VALID_FOLDER=0
+
+                FOLDER_CONTENT="$TEST/*"
+                for SUB_FOLDER in $FOLDER_CONTENT
                 do
-                    if [ -d $SUB_FOLDER ]
+                    if [ -d "${SUB_FOLDER}" ]
                     then
-                        test_exec "$TEST/*"
-                        FOUND_SUBFOLDER=1 
+                        VALID_FOLDER=1
+                        break
                     fi
                 done
 
-                if [ $FOUND_SUBFOLDER == 0 ]
+                if [ $VALID_FOLDER == 0 ]
                 then
                     if [[ "$TEST_TO_BE_EXEC" != "" &&  "$TEST_TO_BE_EXEC" != "${TEST#$1}" ]] 
                     then
                         continue
                     fi
 
-                    echo -e -n "${TEST#$1}:\t"
-                    echo -e "\033[0;33mMandatory '$TEST_FILE_NAME' file in the test directory '$TEST' was not found!\033[0m"
+                    echo -e "\033[0;33mMandatory '$TEST_FILE_NAME' file nor subdirectory was not found in '$TEST'!\033[0m"
+                else
+                    test_exec "$TEST/*"
                 fi
             fi
         fi
-    done 
+    done
 }
 
 

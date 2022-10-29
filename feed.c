@@ -166,8 +166,20 @@ int parse_atom_entry(feed_el_t *cur_feed, xmlNodePtr entry) {
         }
         else if(hasName(child, "link")) {
             xmlChar *link = xmlGetProp(child, (xmlChar *)"href");
-            if(link) {
-                ret = set_feed_field(&(cur_feed->url), link, "link");
+            xmlChar *rel = xmlGetProp(child, (xmlChar *)"rel");
+
+            bool is_alt = !rel || !xmlStrcasecmp(rel, (xmlChar *)"alternate");
+            if(is_alt || !(cur_feed->url)) { //< Set the link URL only if link was not defined yet or rel has default value ("alternate") or via
+                if(link) {
+                    ret = set_feed_field(&(cur_feed->url), link, "link");
+                }
+            }
+            else if(link) {
+                xmlFree(link);
+            }
+            
+            if(rel) {
+                xmlFree(rel);
             }
             
             if(content) xmlFree(content);

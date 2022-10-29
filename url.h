@@ -25,6 +25,8 @@
 
 //Regex macros for parsing URL
 //Based on RFC3986
+#define SCHEME "[a-z][a-z0-9+\\-\\.]*://"
+
 #define HEXDIG "[0-9a-f]"
 #define H16 HEXDIG "{1,4}"
 #define LS32 "(" H16 ":" H16 ")|" IPV4ADDRESS

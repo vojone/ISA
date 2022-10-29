@@ -199,7 +199,7 @@ int https_load(url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
         return CONNECTION_ERROR;
     }
 
-    if(SSL_get_verify_result(ssl) != X509_V_OK) { //< Check verify result
+    if((ret = SSL_get_verify_result(ssl)) != X509_V_OK) { //< Check verify result
         printerr(VERIFICATION_ERROR, "Unable to verify certificate of '%s'! (%s)", url, X509_verify_cert_error_string(ret));
         free_https_connection(bio, ctx);
         return VERIFICATION_ERROR;
@@ -281,29 +281,31 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
         return HTTP_ERROR;
     }
     else if(p_resp->location.st != NULL) {
-        string_t *location = slice2string(&(p_resp->location));
-        if(!location) {
+        string_t *location_str = slice2string(&(p_resp->location));
+        if(!location_str) {
             printerr(INTERNAL_ERROR, "Unable to allocate memory for new URL!");
             return INTERNAL_ERROR;
         }
 
         bool is_path_result = false;
         int ret;
-        if((ret = is_path(&is_path_result, p_resp->location.st)) != SUCCESS) { //< Check if it is only path
+        if((ret = is_path(&is_path_result, location_str->str)) != SUCCESS) { //< Check if it is only path
             return ret;
         }
 
         if(is_path_result) { //< If yes -> recycle old URL with new path (or append it if it is relative path)
-            string_t *tmp = replace_path(cur_url->string, location);
-            string_dtor(location);
-            location = tmp;
+            string_t *tmp = replace_path(cur_url->string, location_str);
+            string_dtor(location_str);
+            location_str = tmp;
         }
 
-        list_el_t *new_element = new_element_non_dup(location); //< Create new element for linked list with URLs
+        list_el_t *new_element = new_element_non_dup(location_str); //< Create new element for linked list with URLs
         if(!new_element) {
             printerr(INTERNAL_ERROR, "Unable to create new URL for redirect from '%s'!", cur_url->string->str);
             return INTERNAL_ERROR;
         }
+
+        printw("Redirected to '%s'!", location_str->str);
 
         new_element->result = SUCCESS;
         new_element->indirect_lvl = cur_url->indirect_lvl + 1; //< Increase redirection lvl (for safety reason)

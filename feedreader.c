@@ -325,8 +325,6 @@ int parse_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
  * in related list_el_t is modified, but processing of other URLs continues
  */
 int do_feedread(list_t *url_list, settings_t *settings) {
-    list_el_t *current = url_list->header;
-
     url_t parsed_url;
     init_url(&parsed_url);
 
@@ -338,6 +336,7 @@ int do_feedread(list_t *url_list, settings_t *settings) {
 
     openssl_init();
 
+    list_el_t *current = url_list->header;
     for(; current; current = current->next) { //< Parse URL, load document and parse it for every URL in linked list
         int *ret = &(current->result);
         char *url = current->string->str;

@@ -73,7 +73,7 @@ Options:
 
 - `-c certfile`   Defines path to the file with certificates, that will be used for verification of server certificate
 
-- `-C certaddr`   Defines path to the folder with certificates, that will be used for verification of server certificate    
+- `-C certaddr`   Defines path to the folder with certificates, that will be used for verification of server certificate (there may be need tu run c_rehash utility above `certaddr` first)
 
 - `-T`  Activates priting of last update time
 
@@ -178,7 +178,10 @@ Introducing: The Apology Line
 
 - `file://` URL scheme (reading from file given by absolute path)
 
-- Percent encoding of URL path - if there are any characters that are not allowed by the RFC3986, they should converted to the percent encoded equivalent (all inputs must be in UTF-8) 
+- Percent encoding of URL path - if there are any characters that are not allowed by the RFC3986, they should converted to the percent encoded equivalent (but **all user inputs must be in UTF-8**) 
+
+## Limitations
+Except of library dependencies (just compilation dependency), input encoding - UTF-8 (if the URLs are not formated properly) and the neccesity to run c_rehash above `certaddr` (it is caused by OpenSSL implementation). The program **does not have any other limitation**.
 
 ## References
 The sources of know-how, that was necessary to make this project:

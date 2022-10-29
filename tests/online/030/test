@@ -1,0 +1,2 @@
+#Verification with only one PEM file (valid until Mar 2029)
+https://xkcd.com/atom.xml -c xkcd-com.pem

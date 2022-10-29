@@ -55,6 +55,38 @@ void free_all_url_patterns(regex_t *regexes) {
 }
 
 
+/**
+ * @brief Checks whether string contains only numbers
+ */
+bool is_numeric_str(char *str) {
+    size_t i = 0;
+    for(; str[i] && (str[i] >= '0' && str[i] <= '9'); i++);
+
+    if(i == strlen(str) - 1) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+
+/**
+ * @brief Removes the last segment of path (file name) from path 
+ */
+void rem_file_from_path(char *path) {
+    int i = strlen(path) - 1, cnt = 0;
+    while(path[i] != '/') {
+        i--;
+        cnt++;
+    }
+
+    cnt++;
+
+    trunc_str(path, -cnt);
+}
+
+
 string_t *replace_path(string_t *orig_url, string_t *path) {
     url_t url;
     init_url(&url);
@@ -70,17 +102,32 @@ string_t *replace_path(string_t *orig_url, string_t *path) {
     }
 
     for(int i = 0; i < PATH; i++) {
-        if(!app_string(&new_url, url.url_parts[i]->str)) {
-            url_dtor(&url);
-            return NULL;
+        if(!is_empty(url.url_parts[i])) {
+            if(i == PORT_PART && !is_numeric_str(url.url_parts[i]->str)) {
+                continue;
+            }
+            else if(i == PORT_PART) {
+                if(!app_string(&new_url, ":")) {
+                    url_dtor(&url);
+                    return NULL;
+                }
+            }
+
+            if(!app_string(&new_url, url.url_parts[i]->str)) {
+                url_dtor(&url);
+                return NULL;
+            }
         }
     }
 
     if(path->str[0] != '/') { //< Path is relative
-        if(!app_string(&new_url, url.url_parts[PATH]->str)) {
-            url_dtor(&url);
-            return NULL;
+        if(!is_empty(url.url_parts[PATH])) {
+            if(!app_string(&new_url, url.url_parts[PATH]->str)) {
+                url_dtor(&url);
+                return NULL;
+            }
         }
+        rem_file_from_path(new_url->str);
     }
 
     if(!app_string(&new_url, path->str)) { //< Append new path
@@ -95,16 +142,17 @@ string_t *replace_path(string_t *orig_url, string_t *path) {
 
 
 int is_path(bool *result, char *str) {
-    regex_t path_re[PATH_RE_NUM];
-    regmatch_t matches[PATH_RE_NUM];
+    regex_t path_re[PATH_RE_NUM + 1];
+    regmatch_t matches[PATH_RE_NUM + 1];
 
-    char *patterns[PATH_RE_NUM] = {
-        "^" PATH_ABS,
-        "^" PATH_NO_SCH,
-        "^" PATH_ROOTLESS,
+    char *patterns[PATH_RE_NUM + 1] = {
+        "^" SCHEME,
+        "^" PATH_ABS "$",
+        "^" PATH_NO_SCH "$",
+        "^" PATH_ROOTLESS "$",
     };
 
-    for(int i = 0; i < PATH_RE_NUM; i++) {
+    for(int i = 0; i < PATH_RE_NUM + 1; i++) {
         if(regcomp(&(path_re[i]), patterns[i], REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
             printerr(INTERNAL_ERROR, "Invalid compilation of path regexes! %d", i);
             return INTERNAL_ERROR;
@@ -112,17 +160,20 @@ int is_path(bool *result, char *str) {
     }
 
     int res;
-    for(int i = 0; i < PATH_RE_NUM; i++) {
+    *result = false;
+    for(int i = 0; i < PATH_RE_NUM + 1; i++) {
         res = regexec(&path_re[i], str, 1, &(matches[i]), 0);
-        if(res == 0) {
+        
+        if(i == 0 && res == 0) {
+            break;
+        }
+        else if(res == 0) {
             *result = true;
             break;
         }
     }
 
-    *result = false;
-
-    for(int i = 0; i < PATH_RE_NUM; i++) {
+    for(int i = 0; i < PATH_RE_NUM + 1; i++) {
         regfree(&(path_re[i]));
     }
 
@@ -155,7 +206,7 @@ int prepare_url_patterns(regex_t *regexes) {
     //Patterns are based on RFC3986
     //http-URI = "http" "://" authority path-abempty [ "?" query ] ("#" [fragment]) (see RFC9110)
     char *patterns[RE_URL_NUM] = {
-        "^[a-z][a-z0-9+\\-\\.]*://",
+        "^" SCHEME,
         "^((" UNRESERVED "|" SUBDELIMS "|:|(" PCTENCODED "))+@)",
         "^((" IPV4ADDRESS ")|(\\[" IPV6ADDRESS "\\])|(" REGNAME "))",
         "^(:[0-9]*)",
