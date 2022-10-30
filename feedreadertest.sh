@@ -131,8 +131,7 @@ function test_exec() {
                 if [ -f "$RET_CODE_FILE_NAME" ]
                 then
                     read EXPECTED_RETURN_CODE < "$RET_CODE_FILE_NAME"
-
-                    if [ $EXPECTED_RETURN_CODE != $RETURN_CODE ]
+                    if [ "$EXPECTED_RETURN_CODE" != "$RETURN_CODE" ]
                     then
                         REASON="${REASON}Return code mismatch, Expected: $EXPECTED_RETURN_CODE Got: $RETURN_CODE\n"
                         RESULT=$FAILED_MSG
@@ -222,11 +221,13 @@ RETURN_PATH=$(realpath .)
 test_exec "$TEST_DIR"
 
 
-echo "Summary: ${PASSED_NUM}/${TOTAL_NUM} tests passed"
+echo -n "Summary: ${PASSED_NUM}/${TOTAL_NUM} tests passed "
 
 if [ $PASSED_NUM == $TOTAL_NUM ]
 then
+    echo -e "\t\033[1;32mWell done! All tests passed!\033[0m"
     exit 0
 else
+    echo ""
     exit 1
 fi

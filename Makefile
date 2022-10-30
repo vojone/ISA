@@ -21,7 +21,7 @@ TEST_FOLDER_NAME = tests
 # Archive
 ARCHIVE_NAME = xdvora3o.tar
 IN_ARCHIVE = $(SRCS) $(HEADERS) README Makefile \
-$(TEST_SCRIPT_NAME) $(TEST_FOLDER_NAME)
+$(TEST_SCRIPT_NAME) $(TEST_FOLDER_NAME) tests_serverside manual.pdf
 
 
 .PHONY: all feedreader debug clean
@@ -36,7 +36,7 @@ debug: feedreader
 
 
 test: $(APP_NAME)
-	./$(TEST_SCRIPT_NAME)
+	bash $(TEST_SCRIPT_NAME)
 
 tar:
 	tar -cf $(ARCHIVE_NAME) $(IN_ARCHIVE)

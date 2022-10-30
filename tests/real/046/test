@@ -1,0 +1,2 @@
+#Real RSS with fake cert
+https://rss.art19.com/apology-line -c "fake-cert.pem"
