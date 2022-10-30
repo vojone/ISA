@@ -57,6 +57,8 @@ Program is also dependent on these libraries:
 
 `openssl` - it is used for fetching data through HTTP(S)
 
+For testing it is neccessary to have `bash` installed.
+
 ## Usage
 Use `make` (or `make debug`) command to compile the program and create the binary. Then test of the program can be executed by `make test` or it can be executed by following scheme: 
 
