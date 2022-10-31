@@ -5,7 +5,7 @@
  * there are also internal functions/structures in cli.c file)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 23. 10. 2022
+ * @date 31. 10. 2022
  */
 
 
@@ -91,7 +91,7 @@ void printw(const char *message,...);
 
 
 /**
- * @brief Prints usage infromation to stdout
+ * @brief Prints usage information to stdout
  * 
  */
 void print_usage();

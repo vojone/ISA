@@ -4,7 +4,7 @@
  * exported functions and structures (ADT)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 23. 10. 2022
+ * @date 31. 10. 2022
  */
 
 #ifndef _FEEDREADER_COMMON_
@@ -22,14 +22,19 @@
 #define INIT_STRING_SIZE 32 //< Default initial size of strings (that are used as buffer)
 #define INIT_NET_BUFF_SIZE 16384 //< Must be big enough for request (at least strlen(req_pattern) + strlen(host) + strlen(path) + strlen("\0"))
 
-#define ABS(x) (unsigned int)((x > 0) ? x : -x)
+#define ABS(x) (unsigned int)((x > 0) ? x : -x) //< Returns absolute value of given numeric value
 
 
+/**
+ * @brief Enum of feed sources types (use to share info about source across 
+ * the program)
+ * 
+ */
 typedef enum src_type {
-    FILE_SRC,
-    HTTP_SRC,
-    HTTPS_SRC,
-    UNKNOWN,
+    FILE_SRC, //< Feed comes from file
+    HTTP_SRC, //< Feed comes from HTTP source
+    HTTPS_SRC, //< Feed comes from HTTPS source
+    UNKNOWN, //< Other types of sources
 } src_type_t;
 
 
@@ -38,9 +43,9 @@ typedef enum src_type {
  *  
  */
 typedef enum doc_type {
-    RSS,
-    ATOM,
-    XML,
+    RSS, //< RSS format of feed ( @see feed.h for specific version of RSS)
+    ATOM, //< Atom format of feed
+    XML, //< General XML (recognition of format is delegated to parser)
     MIME_NUM,
 } doc_type_t;
 

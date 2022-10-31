@@ -4,7 +4,7 @@
  * across the project (mostly suited for ADT declared in .h)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 23. 10. 2022
+ * @date 31. 10. 2022
  */
 
 #include "common.h"
@@ -25,7 +25,7 @@ char *new_str(size_t size) {
 char *shift(char *str, size_t n) {
     char *shifted_str = &str[0];
     for(size_t i = 0; i < n && shifted_str; i++) {
-        shifted_str = &shifted_str[1];
+        shifted_str = &shifted_str[1]; //< Shift the pointer to the next position in memory
     }
 
     return shifted_str;
@@ -38,7 +38,7 @@ bool is_empty(string_t *string) {
 
 
 char *skip_w_spaces(char *str) {
-    while(isspace(str[0])) {
+    while(isspace(str[0])) { //< Skipping chracters until first non-white char
         str = &(str[1]);
     }
 
@@ -110,13 +110,13 @@ list_el_t *slice2element(string_slice_t *slice, size_t indir_level) {
         return NULL;
     }
 
-    new->string = new_string(slice->len + 1);
+    new->string = new_string(slice->len + 1); //< Allocation of the new string
     if(!new->string) {
         free(new);
         return NULL;
     }
 
-    new->string = set_stringn(&(new->string), slice->st, slice->len);
+    new->string = set_stringn(&(new->string), slice->st, slice->len); //< Setting value of string to value described by slice (copying part of some buffer) 
     if(!new->string) {
         free(new);
         return NULL;
@@ -150,11 +150,11 @@ void list_append(list_t *list, list_el_t *new_element) {
     list_el_t *current = list->header;
 
     if(!current) {
-        list->header = new_element;
+        list->header = new_element; //< It is going to be first element in the list
         return;
     }
 
-    while(current->next) { //< Got to he end of the list
+    while(current->next) { //< Go to the end of the list
         current = current->next; 
     };
 
@@ -235,7 +235,7 @@ void rm_char(string_t *dest, size_t index) {
     }
     else {
         size_t rest_len = dest->size - index - 1;
-        memmove(&(dest->str[index]), &(dest->str[index + 1]), rest_len);
+        memmove(&(dest->str[index]), &(dest->str[index + 1]), rest_len); //< Move the part of the buffer to rewrite the character on the given index
     }
 }
 
@@ -252,7 +252,7 @@ string_t *ins_char(string_t **dest, size_t index, char c) {
         }
 
         size_t rest_len = (*dest)->size - index - 1;
-        memmove(&((*dest)->str[index + 1]), &((*dest)->str[index]), rest_len);
+        memmove(&((*dest)->str[index + 1]), &((*dest)->str[index]), rest_len); //< Create "gap" for character
         (*dest)->str[index] = c;
     }
 
@@ -306,7 +306,7 @@ string_t *ext_string(string_t *string) {
 
     string->size *= coef;
 
-    memset(&(string->str[old_size]), 0, string->size - old_size);
+    memset(&(string->str[old_size]), 0, string->size - old_size); //< Initializing the new part of the string 
 
     return string;
 }
@@ -322,7 +322,7 @@ string_t *set_stringn(string_t **dest, char *src, size_t n) {
 
     memset((*dest)->str, 0, (*dest)->size);
 
-    while((*dest)->size <= n) {
+    while((*dest)->size <= n) { //< Set only the given number of characters
         if(!(*dest = ext_string(*dest))) {
             return NULL;
         }
