@@ -3,7 +3,7 @@
  * @brief Source file with main function of feedreader program
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 23. 10. 2022
+ * @date 1. 11. 2022
  */
 
 #include "feedreader.h"
@@ -253,19 +253,20 @@ int load_data(url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
 
 
 /**
- * @brief 
+ * @brief Parses and checks the raw data that came from HTTP connection
+ * 
  */
 int parse_http_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
     h_resp_t parsed_resp;
     init_h_resp(&parsed_resp);
 
     erase_h_resp(&parsed_resp);
-    int ret = parse_http_resp(&parsed_resp, data_buff, ctx->url);
+    int ret = parse_http_resp(&parsed_resp, data_buff, ctx->url); //< Firstly, we must extract the headers and so on
     if(ret != SUCCESS) {
         return ret;
     }
 
-    ret = check_http_resp(&parsed_resp, current, ctx->url);
+    ret = check_http_resp(&parsed_resp, current, ctx->url); //< Then is response checked (especilly the status is checked)
     if(ret != SUCCESS) {
         return ret;
     }

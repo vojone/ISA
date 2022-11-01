@@ -4,7 +4,7 @@
  * RSS2/Atom feeds)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 23. 10. 2022 
+ * @date 1. 11. 2022 
  */
 
 #include "feed.h"
@@ -106,7 +106,7 @@ int set_feed_field(xmlChar **field, xmlChar *new_content, const char *tag) {
         return FEED_ERROR;
     }
 
-    if(*field) {
+    if(*field) { //< Free current content to avoid memory leaks
         xmlFree(*field);
         *field = NULL;
     }
@@ -117,6 +117,13 @@ int set_feed_field(xmlChar **field, xmlChar *new_content, const char *tag) {
 }
 
 
+/**
+ * @brief Parses Atom HTML author structure and extracts name from it
+ * 
+ * @param author The xml node that represents author structure
+ * @param cur_feed The ptr to the structure, that should be filled with author name
+ * @return SUCCESS if everything went OK (even if the name of the author was not found)  
+ */
 int parse_atom_author(xmlNodePtr author, feed_el_t *cur_feed) {
     int ret = SUCCESS;
     
@@ -263,10 +270,10 @@ int parse_rss_item(xmlNodePtr item, feed_el_t *cur_feed) {
         else if(hasName(item_child, "link")) {
             ret = set_feed_field(&(cur_feed->url), content, "link");
         }
-        else if(hasName(item_child, "pubDate")) { //?
+        else if(hasName(item_child, "pubDate")) { //Equivalent of <published> (due to forum)
             ret = set_feed_field(&(cur_feed->updated), content, "pubDate");
         }
-        else if(hasName(item_child, "author")) { //?
+        else if(hasName(item_child, "author")) { //Equivalent of Atom <author> structure (due to forum)
             ret = set_feed_field(&(cur_feed->auth_name), content, "author");
         }
         else {
@@ -342,6 +349,9 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
 }
 
 
+/**
+ * @brief Selects the parsing function due to root element 
+ */
 int sel_parser(xmlNodePtr root, int exp_type, char *url, parse_f_ptr_t *func) {
     int real_mime;
 
@@ -377,7 +387,7 @@ int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url) {
         xml_p_flags |= XML_PARSE_NOERROR | XML_PARSE_NOWARNING;
     #endif
 
-    xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, xml_p_flags); //< PArse document by libxml2
+    xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, xml_p_flags); //< Parse document by libxml2
     if(!xml) {
         printerr(INTERNAL_ERROR, "Unable to parse XML document from '%s'!", url);
         return INTERNAL_ERROR;

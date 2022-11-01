@@ -24,7 +24,7 @@
 #define RSS_VERSION "2.0" //< Supported version of RSS format
 
 
-#define FORMAT_STRICT
+#define FORMAT_STRICT //< Always check the name of the root element
 
 
 /**
