@@ -37,8 +37,15 @@ bool is_empty(string_t *string) {
 }
 
 
-char *skip_w_spaces(char *str) {
+char *skip_w_spaces(char *str, bool newline_stop) {
     while(isspace(str[0])) { //< Skipping chracters until first non-white char
+
+        if(newline_stop) {
+            if(str[0] == '\r' || str[0] == '\n') {
+                break;
+            }
+        }
+
         str = &(str[1]);
     }
 

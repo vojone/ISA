@@ -486,7 +486,7 @@ void parse_hdrs(char *line_end, resp_parse_ctx_t *ctx, h_resp_t *p_resp) {
 
     res[LOC] = regexec(&(regexes[LOC]), *cursor, 1, &(matches[LOC]), 0);
     if(res[LOC] != REG_NOMATCH) { //< It is location header! (important for redirection)
-        *cursor =  skip_w_spaces(&((*cursor)[matches[LOC].rm_eo]));
+        *cursor =  skip_w_spaces(&((*cursor)[matches[LOC].rm_eo]), true);
         size_t len = (size_t)(line_end - *cursor);
         p_resp->location = new_str_slice(*cursor, len - strlen("\r\n")); //< Saving position and length of field with location info
     }
@@ -494,7 +494,7 @@ void parse_hdrs(char *line_end, resp_parse_ctx_t *ctx, h_resp_t *p_resp) {
     regex_t *con_type_r = &(regexes[CON_TYPE]);
     res[CON_TYPE] = regexec(con_type_r, *cursor, 1, &(matches[CON_TYPE]), 0);
     if(res[CON_TYPE] != REG_NOMATCH) { //< It is content-type header! (important for check of the MIME)
-        *cursor =  skip_w_spaces(&((*cursor)[matches[CON_TYPE].rm_eo]));
+        *cursor =  skip_w_spaces(&((*cursor)[matches[CON_TYPE].rm_eo]), true);
         size_t len = (size_t)(line_end - *cursor);
         p_resp->content_type = new_str_slice(*cursor, len - strlen("\r\n"));
     }
@@ -517,7 +517,7 @@ int parse_first_line(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *url) {
         *cursor = &((*cursor)[matches[VER].rm_eo]);
     }
 
-    *cursor = skip_w_spaces(*cursor);
+    *cursor = skip_w_spaces(*cursor, true);
     res[STAT] = regexec(&(regexes[STAT]), *cursor, 1, &(matches[STAT]), 0);
     if(res[STAT] == REG_NOMATCH) { //< The status field was found
         printerr(HTTP_ERROR, "Unable to find status code in reponse from '%s'!", *cursor);
@@ -528,7 +528,7 @@ int parse_first_line(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *url) {
     p_resp->status = new_str_slice(*cursor, status_len);
     *cursor = &((*cursor)[matches[STAT].rm_eo]);
 
-    *cursor = skip_w_spaces(*cursor);
+    *cursor = skip_w_spaces(*cursor, true);
     res[PHR] = regexec(&(regexes[PHR]), *cursor, 1, &(matches[PHR]), 0);
     if(res[PHR] == REG_NOMATCH) { //< Phrase field was found
         printerr(HTTP_ERROR, "Unable to find status phrase in reponse from '%s'!", url);

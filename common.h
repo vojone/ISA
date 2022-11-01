@@ -126,10 +126,11 @@ bool is_empty(string_t *string);
  * @brief Skips all whitespaces from the start of the given character buffer
  * 
  * @param str Ptr to the beginning of the string (with whitespaces)
+ * @param check_newlines If it is true, the newline (end of the line) stops skipping
  * @return char* Ptr to the beginning of the string withotu whitespaces at the start
  * @warning Consider saving ptr to the original string (else it can cause e. g. memory leaks)
  */
-char *skip_w_spaces(char *str);
+char *skip_w_spaces(char *str, bool newline_stop);
 
 
 /**
