@@ -42,15 +42,16 @@ int send_request(BIO *bio, url_t *p_url, char *url) {
 
     char request_b[INIT_NET_BUFF_SIZE];
     snprintf(request_b, INIT_NET_BUFF_SIZE, 
-        "GET %s " HTTP_VERSION "\r\n"
-        "Host: %s%s%s\r\n" //< Mandatory due to RFC2616
+        "GET %s%s%s " HTTP_VERSION "\r\n"
+        "Host: %s\r\n" //< Mandatory due to RFC2616
         "Connection: close\r\n" //< Connection will be closed after completition of the response
         "User-Agent: ISAFeedReader/1.0\r\n" //< Just to better filtering from the other traffic
         "\r\n",
         p_url->url_parts[PATH]->str, 
         !is_empty(p_url->url_parts[QUERY]) ? p_url->url_parts[QUERY]->str : "",
         !is_empty(p_url->url_parts[FRAG_PART]) ? p_url->url_parts[FRAG_PART]->str : "",
-        p_url->url_parts[HOST]->str);
+        p_url->url_parts[HOST]->str
+    );
 
     #ifdef DEBUG
         fprintf(stderr, "Request:\n");

@@ -389,15 +389,15 @@ int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url) {
 
     xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, xml_p_flags); //< Parse document by libxml2
     if(!xml) {
-        printerr(INTERNAL_ERROR, "Unable to parse XML document from '%s'!", url);
-        return INTERNAL_ERROR;
+        printerr(FEED_ERROR, "Unable to parse XML document from '%s'!", url);
+        return FEED_ERROR;
     }
 
     xmlNodePtr root = xmlDocGetRootElement(xml); //< Get The root element of XML doc
     if(!root) {
-        printerr(INTERNAL_ERROR, "Unable to find root node of XML document from '%s'!", url);
+        printerr(FEED_ERROR, "Unable to find root node of XML document from '%s'!", url);
         xmlFreeDoc(xml);
-        return INTERNAL_ERROR;
+        return FEED_ERROR;
     }
 
     //Determine the format of by the first tag the feed document
