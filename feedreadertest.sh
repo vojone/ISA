@@ -43,42 +43,68 @@ FAILED_MSG="[ \033[0;31mFAILED\033[0m ]"
 
 TEST_TO_BE_EXEC=""
 
-# Parse options
-while getopts "vmht:" OPT
-do
-    if [ "$OPT" = "v" ]
-    then
-        VERBOSE=1
-    elif [ "$OPT" = "m" ]
-    then
-        MEMCHECK=1
-    elif [ "$OPT" = "h" ]
-    then
-        echo "Test script of feedreader program."
-        echo
-        echo "USAGE: ./feedreadertest.sh [OPTIONS]..."
-        echo
-        echo "Options:"
-        echo -e "-m\tActivates memory checks (valgrind is needed)"
-        echo -e "-v\tPreserves temporary files in test folders (for debugging)"
-        echo -e "-h\tPrints help and ends program"
-        echo -e "-t test1\tRuns only test in 'test1' folder"
-        echo
-        echo "Return codes:"
-        echo "0 - All tests passed"
-        echo "1 - There are failed tests"
-        exit 0
-    elif [ "$OPT" = "t" ]
-    then
-        TEST_TO_BE_EXEC=$OPTARG
-    fi
-done
+VALGRIND_CMD="valgrind"
 
+# Initialization of global values for storing the tests summary
 PASSED_NUM=0
 TOTAL_NUM=0
 
-date
-echo "Running tests of feedreader:"
+
+# Parse options
+function parse_options() {
+    while getopts "vmht:p:" OPT
+    do
+        if [ "$OPT" = "v" ]
+        then
+            VERBOSE=1
+        elif [ "$OPT" = "m" ]
+        then
+            MEMCHECK=1
+        elif [ "$OPT" = "h" ]
+        then
+            echo "Test script of feedreader program."
+            echo
+            echo "USAGE: ./feedreadertest.sh [OPTIONS]..."
+            echo
+            echo "Options:"
+            echo -e "-m\tActivates memory checks (valgrind is needed)"
+            echo -e "-v\tPreserves temporary files in test folders (for debugging)"
+            echo -e "-h\tPrints help and ends program"
+            echo -e "-t test1\tRuns only test in 'test1' folder"
+            echo -e "-p path\tSpecifies the path to the program to be tested"
+            echo
+            echo "Return codes:"
+            echo "0 - All tests passed"
+            echo "1 - There are failed tests"
+            exit 0
+        elif [ "$OPT" = "p" ]
+        then
+            PROGRAM_PATH=$OPTARG
+        elif [ "$OPT" = "t" ]
+        then
+            TEST_TO_BE_EXEC=$OPTARG
+        fi
+    done
+}
+
+
+function check_binaries() {
+    if [ ! -x "$PROGRAM_PATH" ]
+    then
+        echo "Unable to execute file '${PROGRAM_PATH}'! (check the path, please)"
+        exit 2
+    fi
+
+
+    if [ $MEMCHECK == 1 ]
+    then
+        if ! command -V "$VALGRIND_CMD" >/dev/null 2>&1
+        then
+            echo "Used option '-m', but unable to execute '${VALGRIND_CMD}' for memcheck!"
+            exit 2
+        fi
+    fi
+}
 
 
 function test_exec() {
@@ -120,7 +146,7 @@ function test_exec() {
 
                 if [ $MEMCHECK == 1 ] # Testing
                 then
-                    eval "valgrind --leak-check=full --log-file=\"${VALGRIND_LOG_FILE_NAME}\" ${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
+                    eval "${VALGRIND_CMD} --leak-check=full --log-file=\"${VALGRIND_LOG_FILE_NAME}\" ${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
                 else
                     eval "${PROGRAM_REALPATH} >${RESULT_FILE} 2>${ERROR_FILE} ${ARGS}"
                 fi
@@ -214,13 +240,22 @@ function test_exec() {
             fi
         fi
     done
-}
+} # End of function test_exec
 
+
+# Main body of the test script
+
+parse_options $*
+
+check_binaries
+
+date
+echo "Running tests of feedreader:"
 
 RETURN_PATH=$(realpath .)
 test_exec "$TEST_DIR"
 
-
+# Printing summary
 echo -n "Summary: ${PASSED_NUM}/${TOTAL_NUM} tests passed "
 
 if [ $PASSED_NUM == $TOTAL_NUM ]
@@ -231,3 +266,5 @@ else
     echo ""
     exit 1
 fi
+
+# End of the main body
