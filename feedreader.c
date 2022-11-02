@@ -111,7 +111,7 @@ int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
 int parse_feedfile(char *path, list_t *url_list) {
     FILE *file_ptr = fopen(path, "r");
     if(!file_ptr) {
-        printerr(FILE_ERROR, "%s", strerror(errno));
+        printerr(FILE_ERROR, "%s (path '%s')", strerror(errno), path);
         return FILE_ERROR;
     }
 

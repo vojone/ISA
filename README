@@ -83,6 +83,8 @@ Options:
 
 - `-u`  Activates printing of associated URL
 
+If there are more occurences of one option the last one is take into count.
+
 
 ## Examples
 Simple reading of one RSS source:

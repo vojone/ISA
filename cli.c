@@ -194,6 +194,8 @@ char *get_arg(int argc, char **argv, int *opt_index, char *exp_start) {
         }
     }
     else { //< Argument of the option starts immediately after the option
+        (*opt_index)++;
+
         return exp_start;
     }
 }
@@ -264,9 +266,14 @@ int parse_opts(int argc, char **argv, settings_t *settings) {
                 cur_char_i++;
 
                 // Set values associated with the option (flag/pointer to the argument)
+                int last_i = i;
                 ret = set_values(argc, argv, &i, &current_opt[cur_char_i], &option);
                 if(ret != SUCCESS) {
                     return ret;
+                }
+
+                if(last_i != i) {
+                    break;
                 }
             }
         }
