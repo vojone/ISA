@@ -4,7 +4,7 @@
  * exported functions and structures (ADT)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 31. 10. 2022
+ * @date 5. 11. 2022
  */
 
 #ifndef _FEEDREADER_COMMON_

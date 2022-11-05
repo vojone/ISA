@@ -154,7 +154,7 @@ int is_path(bool *result, char *str) {
 
     for(int i = 0; i < PATH_RE_NUM + 1; i++) {
         if(regcomp(&(path_re[i]), patterns[i], REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
-            printerr(INTERNAL_ERROR, "Invalid compilation of path regexes! %d", i);
+            printerr(INTERNAL_ERROR, "Chyba pro kompilaci regularniho vyrazu! %d", i);
             return INTERNAL_ERROR;
         }
     }
@@ -218,7 +218,7 @@ int prepare_url_patterns(regex_t *regexes) {
 
     for(int i = 0; i < RE_URL_NUM; i++) {
         if(regcomp(&(regexes[i]), patterns[i], REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
-            printerr(INTERNAL_ERROR, "Invalid compilation of URL regexes! %d", i);
+            printerr(INTERNAL_ERROR, "Chyba pro kompilaci regularniho vyrazu pro URL! %d", i);
             return INTERNAL_ERROR;
         }
     }
@@ -235,36 +235,36 @@ int prepare_url_patterns(regex_t *regexes) {
 
 int res_url(bool is_inv, bool int_err, int *res, url_t *p_url, char *url) {
     if(int_err) {
-        printerr(INTERNAL_ERROR, "Error while parsing URL!");
+        printerr(INTERNAL_ERROR, "Chyba pri analyze URL!");
         return INTERNAL_ERROR;
     }
 
     if(res[SCHEME_PART] == REG_NOMATCH) { //< Non-strict parsing
-        printw("Valid scheme part of URL '%s' was not found! It will be set to default ('%s')!", url, DEFAULT_URL_SCHEME);
+        printw("Nebylo mozne najit platne schema URL v '%s'! URL bude automaticky doplnena o vychozi schema ('%s')!", url, DEFAULT_URL_SCHEME);
         p_url->type = get_src_type(NULL);
     }
     else if(!is_empty(p_url->url_parts[SCHEME_PART])) { //< Check whether is scheme supported
         p_url->type = get_src_type(p_url->url_parts[SCHEME_PART]->str);
         if(p_url->type == UNKNOWN) {
-            printerr(URL_ERROR, "Unsupported scheme '%s' of URL '%s'!", p_url->url_parts[SCHEME_PART]->str, url);
+            printerr(URL_ERROR, "Nepodporovane schema '%s' adresy '%s'!", p_url->url_parts[SCHEME_PART]->str, url);
             return URL_ERROR;
         }
     }
 
     if(p_url->type == FILE_SRC) {
         if(res[PATH] == REG_NOMATCH || is_inv) { //< Host was not found in URL
-            printerr(URL_ERROR, "Bad format of URL '%s'!", url);
+            printerr(URL_ERROR, "Spatny format URL adresy '%s'!", url);
             return URL_ERROR;
         }
     }
     else {
         if(res[HOST] == REG_NOMATCH || is_inv) { //< Host was not found in URL
-            printerr(URL_ERROR, "Bad format of URL '%s'!", url);
+            printerr(URL_ERROR, "Spatny format URL adresy '%s'!", url);
             return URL_ERROR;
         }
 
         if(res[USER_INFO_PART] != REG_NOMATCH) {
-            printw("Deprecated userinfo part '%s' was found in URL '%s'! It will be ignored!", p_url->url_parts[USER_INFO_PART]->str, url);
+            printw("Zastarala autentizacni cast '%s' byla nalezena v '%s'! Bude ignorovana!", p_url->url_parts[USER_INFO_PART]->str, url);
         }
     }
 
@@ -282,7 +282,7 @@ int ins_perc_encoded(string_t **dst, size_t index, char c) {
     if(!ins_char(dst, index, '%') || 
         !ins_char(dst, index + 1, tmp[0]) || 
         !ins_char(dst, index + 2, tmp[1])) {
-        printerr(INTERNAL_ERROR, "Unable to convert character to percent form!");
+        printerr(INTERNAL_ERROR, "Nepodarilo se provest zakodovani znaku!");
         return INTERNAL_ERROR;
     }
 
@@ -300,7 +300,7 @@ int perc_enc(string_t **src, const char *pattern) {
     int ret;
 
     if(regcomp(&reg, pattern, REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
-        printerr(INTERNAL_ERROR, "Invalid compilation of regex! %d");
+        printerr(INTERNAL_ERROR, "Neplatna kompilace regularniho vyrazu! %d");
         return INTERNAL_ERROR;
     }
 
@@ -352,7 +352,7 @@ int normalize_url(url_t *p_url, char* def_scheme_part_str) {
 
         url_parts[SCHEME_PART] = set_string(dst, def_scheme_part_str);
         if(!p_url->url_parts[SCHEME_PART]) {
-            printerr(INTERNAL_ERROR, "Unable to allocate buffer for scheme part of URL!");
+            printerr(INTERNAL_ERROR, "Nepodrailo se alokovat pamet pro schema URL!");
             return INTERNAL_ERROR;
         }
     }
@@ -366,7 +366,7 @@ int normalize_url(url_t *p_url, char* def_scheme_part_str) {
 
         url_parts[PORT_PART] = set_string(dst, url_parts[SCHEME_PART]->str);
         if(!url_parts[PORT_PART]) {
-            printerr(INTERNAL_ERROR, "Unable to allocate buffer for port part of URL!");
+            printerr(INTERNAL_ERROR, "Nepodarilo se alokovat pamet pro portove cislo!");
             return INTERNAL_ERROR;
         }
 
@@ -380,7 +380,7 @@ int normalize_url(url_t *p_url, char* def_scheme_part_str) {
 
         url_parts[PATH] = set_string(dst, "/");
         if(!url_parts[PATH]) {
-            printerr(INTERNAL_ERROR, "Unable to allocate buffer for path of URL!");
+            printerr(INTERNAL_ERROR, "Nepodarilo se alokovat pamet pro cestu!");
             return INTERNAL_ERROR;
         }
     }

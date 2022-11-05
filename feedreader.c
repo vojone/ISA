@@ -3,7 +3,7 @@
  * @brief Source file with main function of feedreader program
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 1. 11. 2022
+ * @date 5. 11. 2022
  */
 
 #include "feedreader.h"
@@ -20,7 +20,7 @@
 int move_to_list(string_t *buffer, list_t *dst_list) {
     list_el_t *new_url = new_element(buffer->str);
     if(!new_url) {
-        printerr(INTERNAL_ERROR, "Unable to move '%s' to the list!", buffer->str);
+        printerr(INTERNAL_ERROR, "Nepodarilo se presunout '%s' do seznamu!", buffer->str);
         return INTERNAL_ERROR;
     }
 
@@ -42,12 +42,12 @@ int move_to_list(string_t *buffer, list_t *dst_list) {
  */
 int validate_settings(settings_t *settings) {
     if(!settings->url && !settings->feedfile) {
-        printerr(USAGE_ERROR, "URL or feedfile required!");
+        printerr(USAGE_ERROR, "Je vyzadovana URL nebo soubor s adresami!");
         print_usage();
         return USAGE_ERROR;
     }
     else if(settings->url && settings->feedfile) {
-        printerr(USAGE_ERROR, "Specified feedfile and URL at the same time!");
+        printerr(USAGE_ERROR, "Nelze specifikovat soubor s adresymi a URL zaroven!");
         print_usage();
         return USAGE_ERROR;
     }
@@ -75,7 +75,7 @@ int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
 
     if(*len > 0 && c == '\n') { //< If there is newline and buffer is not empty -> move URL to the list
         if((ret = move_to_list(buff, list)) != SUCCESS) {
-            printerr(INTERNAL_ERROR, "Unable to move URL to the list!");
+            printerr(INTERNAL_ERROR, "Nepodarilo se presunout URL do seznamu!");
             return INTERNAL_ERROR;
         }
 
@@ -90,7 +90,7 @@ int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
     }
     else { //< Regular character
         if(!(buff = app_char(&buff, c))) {
-            printerr(INTERNAL_ERROR, "Unable to append char to the string while parsing feedfile!");
+            printerr(INTERNAL_ERROR, "Neocekavana chyba pri analyze souboru s adresami!");
             return INTERNAL_ERROR;
         }
 
@@ -111,13 +111,13 @@ int proc_char(char c, string_t *buff, list_t *list, int *len, bool *is_cmnt) {
 int parse_feedfile(char *path, list_t *url_list) {
     FILE *file_ptr = fopen(path, "r");
     if(!file_ptr) {
-        printerr(FILE_ERROR, "%s (path '%s')", strerror(errno), path);
+        printerr(FILE_ERROR, "%s (%s)", path, strerror(errno));
         return FILE_ERROR;
     }
 
     string_t *buffer = new_string(INIT_STRING_SIZE); //< Buffer for the file content
     if(!buffer) {
-        printerr(INTERNAL_ERROR, "Unable to allocate buffer for parsing feedfile!");
+        printerr(INTERNAL_ERROR, "Nepodarilo se alokovat pamet pro analyzu souboru s adresami!");
         fclose(file_ptr);
         return INTERNAL_ERROR;
     }
@@ -196,7 +196,7 @@ int load_from_file(url_t *p_url, string_t *data_buff) {
     char *path = p_url->url_parts[PATH]->str;
     FILE *src = fopen(path, "r");
     if(!src) {
-        printerr(FILE_ERROR, "Unable to open file on path '%s'! (%s)", path, strerror(errno));
+        printerr(FILE_ERROR, "Nepodarilo se otevrit soubor '%s'! (%s)", path, strerror(errno));
         return FILE_ERROR;
     }
 
@@ -207,7 +207,7 @@ int load_from_file(url_t *p_url, string_t *data_buff) {
         char *mem_dest = &(data_buff->str[b_read]);
         newly_read_b = fread(mem_dest, sizeof(char), empty_size, src);
         if(newly_read_b == 0 && !feof(src)) {
-            printerr(FILE_ERROR, "Error while reading data from file '%s'!", path);
+            printerr(FILE_ERROR, "Chyba pri cteni dat z '%s'!", path);
             return FILE_ERROR;
         }
 
@@ -215,7 +215,7 @@ int load_from_file(url_t *p_url, string_t *data_buff) {
         empty_size -= newly_read_b;
         if(empty_size == 0) { //< If there is no place for the new characters -> extend buffer
             if((data_buff = ext_string(data_buff)) == NULL) {
-                printerr(INTERNAL_ERROR, "Unable to extend buffer for data!");
+                printerr(INTERNAL_ERROR, "Nepodarilo se rozsirit buffer pro data!");
                 fclose(src);
                 return INTERNAL_ERROR;
             }
@@ -246,7 +246,7 @@ int load_data(url_t *p_url, string_t *data_buff, char *url, settings_t *s) {
         case HTTP_SRC:
             return http_load(p_url, data_buff, url);
         default:
-            printerr(URL_ERROR, "Unsupported type of source ('%s')!", url);
+            printerr(URL_ERROR, "Nepodporovany typ zdroje ('%s')!", url);
             return URL_ERROR;
     }
 }
@@ -307,7 +307,7 @@ int parse_data(data_ctx_t *ctx, list_el_t *current, string_t *data_buff) {
             ctx->exp_type = XML;
             break;
         default:
-            printerr(URL_ERROR, "Unsupported source type '%s'!", scheme);
+            printerr(URL_ERROR, "Nepodporovany typ zdroje '%s'!", scheme);
             return URL_ERROR;
     }
 
@@ -331,7 +331,7 @@ int do_feedread(list_t *url_list, settings_t *settings) {
 
     string_t *data_buff = new_string(INIT_NET_BUFF_SIZE);
     if(!data_buff) {
-        printerr(INTERNAL_ERROR, "Unable to allocate buffer for responses!");
+        printerr(INTERNAL_ERROR, "Nepodarilo se alokovat pamet pro data!");
         return INTERNAL_ERROR;
     }
 
@@ -392,7 +392,7 @@ int create_url_list(list_t *url_list, settings_t *settings) {
     else if(settings->url) { //< Put URL from argument to the liast as one element
         list_el_t *first = new_element(settings->url);
         if(!first) {
-            printerr(INTERNAL_ERROR, "Unable to allocate new element for url list!");
+            printerr(INTERNAL_ERROR, "Nepodarilo se vytvorit novy element pro seznam URL adres!");
             ret_code = INTERNAL_ERROR;
         }
         else {

@@ -5,7 +5,7 @@
  * @note Uses opensll library
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022
+ * @date 5. 11. 2022
  */
 
 #ifndef _FEEDREADER_HTTP_

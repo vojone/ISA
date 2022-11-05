@@ -3,7 +3,7 @@
  * @brief Source file with functions resposible for communication with the user
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 23. 10. 2022
+ * @date 5. 11. 2022
  */
 
 #include "cli.h"
@@ -16,17 +16,17 @@ void init_settings(settings_t *settings) {
 
 void printerr(int err_code, const char *message_format,...) {
     char *err_str[] = { //< Headers of error message (for general message classification)
-        "Success",
-        "Usage error",
-        "Error while opening file",
-        "Invalid URL",
-        "Connection error",
-        "Communication error",
-        "Path error",
-        "Verification error",
-        "HTTP error",
-        "Feed source error",
-        "Internal error",
+        "OK",
+        "Chyba pouziti programu",
+        "Chyba pri otevirani souboru",
+        "Neplatna URL",
+        "Chyba spojeni",
+        "Chyba komunikace",
+        "Neplatna cesta k souboru",
+        "Chyba verifikace",
+        "Chyba HTTP",
+        "Chyba zdroje",
+        "Interni chyba programu",
     };
 
     fprintf(stderr, "%s: %s: ", PROGNAME, err_str[err_code]); //< Print headers
@@ -44,7 +44,7 @@ void printerr(int err_code, const char *message_format,...) {
 void printw(const char *message_format,...) {
     #ifdef CLI_WARNINGS
     
-        fprintf(stderr, "%s: Warning: ", PROGNAME);
+        fprintf(stderr, "%s: Varovani: ", PROGNAME);
 
         if(message_format) {
             va_list args;
@@ -68,17 +68,17 @@ void print_usage() {
 
 void print_help() {
     const char *about_msg = 
-        "Reader of news in Atom/RSS2.0\n";
+        "Ctecka novinek ve formatu Atom/RSS2.0 s podporou TLS\n";
 
     const char *option_msg = 
         "options:\n"
-        "-h, --help     Prints help to stderr\n"
-        "-f feedfile    Specifies path to a file with URLs to Atom/RSS sources\n"
-        "-c certfile    Specifies path to a file with certificates\n"
-        "-C certaddr    Specifies path to a folder with certificate files\n"
-        "-T             Adds information about update time to the output\n"
-        "-u             Adds associated URL to the output\n"
-        "-a             Adds author name to the output\n";
+        "-h, --help     Vypise na napovedu na stdout\n"
+        "-f feedfile    Specifikuje cestu k souboru s URL vedoucich ke zdrojum Atom/RSS\n"
+        "-c certfile    Specifikuje cestu k souboru s certifikatem\n"
+        "-C certaddr    Specifikuje slozku ke slozce s certifikaty\n"
+        "-T             Prida informaci o aktualizace na vystup programu\n"
+        "-u             Prida asociovanou URL na vystup programu\n"
+        "-a             Prida jmenu autora na vystup programu\n";
 
     fprintf(stdout, "%s\n", about_msg);
     print_usage();
@@ -131,7 +131,7 @@ int rec_opt(char opt_char, opt_t *opt, settings_t *s) {
             opt->arg = &s->certaddr;
             break;
         default: //< Unknown option was used
-            printerr(USAGE_ERROR, "Unknown option -%c!", opt_char);
+            printerr(USAGE_ERROR, "Neznamy prepinac -%c!", opt_char);
             return USAGE_ERROR;
     }
 
@@ -161,7 +161,7 @@ int rec_lopt(char *cur_opt, int *char_i, opt_t *opt, settings_t *s) {
         opt->flag = &s->help_flag;
     }
     else { //< Long option was not recognized
-        printerr(USAGE_ERROR, "Unknown option: --%s!", opt_str);
+        printerr(USAGE_ERROR, "Neznamy prepinac: --%s!", opt_str);
         return USAGE_ERROR;
     }
 
@@ -221,7 +221,7 @@ int set_values(int argc, char **argv, int *opt_i, char *start, opt_t *option) {
 
         if(!*(option->arg)) {
             char *opt_name = option->name;
-            printerr(USAGE_ERROR, "Option '%s' requires an argument!", opt_name);
+            printerr(USAGE_ERROR, "Prepinac '%s' vyzaduje argument!", opt_name);
             return USAGE_ERROR;
         }
     }

@@ -4,7 +4,7 @@
  * across the project (mostly suited for ADT declared in .h)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 31. 10. 2022
+ * @date 5. 11. 2022
  */
 
 #include "common.h"

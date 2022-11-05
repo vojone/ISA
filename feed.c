@@ -4,7 +4,7 @@
  * RSS2/Atom feeds)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 1. 11. 2022 
+ * @date 5. 11. 2022 
  */
 
 #include "feed.h"
@@ -102,7 +102,7 @@ bool hasName(xmlNodePtr node, const char *name) {
  */
 int set_feed_field(xmlChar **field, xmlChar *new_content, const char *tag) {
     if(!new_content) {
-        printerr(FEED_ERROR, "Unable to get content of the '%s' tag!", tag);
+        printerr(FEED_ERROR, "Nepovedlo se ziskat obsah znacky '%s'!", tag);
         return FEED_ERROR;
     }
 
@@ -229,7 +229,7 @@ int parse_atom(xmlNodePtr root, feed_doc_t *feed_doc) {
         }
         else if(hasName(root_child, "entry")) { //< Entry was found
             if(!(cur_feed = new_feed(feed_doc))) {
-                printerr(INTERNAL_ERROR, "Unable to allocate memory for feed structure!");
+                printerr(INTERNAL_ERROR, "Nepodarilo se alokovat strukturu pro novinku!");
                 return INTERNAL_ERROR;
             }
             
@@ -304,14 +304,14 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
 
     xmlChar *v = xmlGetProp(root, (const xmlChar *)"version"); //< Get version attribute
     if(!v) {
-        printerr(FEED_ERROR, "Missing mandatory version attribute of 'rss' in rss tag!");
+        printerr(FEED_ERROR, "Chybejici atribut znacky 'rss' udavajici verzi RSS protokolu!");
         return FEED_ERROR;
     }
 
     bool is_supported = !xmlStrcasecmp(v, (const xmlChar *)RSS_VERSION); //< Check RSS version (mandatory tag)
 
     if(!is_supported) {
-        printerr(FEED_ERROR, "Unsupported version of RSS. Supported '%s' got '%s'!", RSS_VERSION, v);
+        printerr(FEED_ERROR, "Nepodoporovana verze RSS. Podporovana '%s', ziskana '%s'!", RSS_VERSION, v);
         xmlFree(v);
         return FEED_ERROR;
     }
@@ -329,7 +329,7 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
                 }
                 else if(hasName(channel_child, "item")) {
                     if(!(cur_feed = new_feed(feed_doc))) {
-                        printerr(INTERNAL_ERROR, "Unable to allocate memory for feed structure!");
+                        printerr(INTERNAL_ERROR, "Nepodarilo se alokovat pamet pro novinku!");
                         return INTERNAL_ERROR;
                     }
                     ret = parse_rss_item(channel_child, cur_feed);
@@ -365,13 +365,13 @@ int sel_parser(xmlNodePtr root, int exp_type, char *url, parse_f_ptr_t *func) {
     }
     else {
         #ifdef FORMAT_STRICT
-            printerr(FEED_ERROR, "Unexpected name of root element of XML from '%s'! Expected feed/rss", url);
+            printerr(FEED_ERROR, "Neocekavany nazev korenove znacky XML z '%s'! Ocekavano 'feed'/'rss'", url);
             return FEED_ERROR;
         #endif
     }
 
     if(real_mime != exp_type && exp_type != XML) { //< The it seems that mime type of document is wrong
-        printw("The real format of feed document from '%s' does not match the MIME type of HTTP response!", url);
+        printw("Skutecny format dokumentu z '%s' se neshoduje s MIME typem HTTP odpovedi!", url);
     }
 
     return SUCCESS;
@@ -389,13 +389,13 @@ int parse_feed_doc(feed_doc_t *feed_doc, int exp_type, char *feed, char *url) {
 
     xmlDocPtr xml = xmlReadMemory(feed, strlen(feed), url, NULL, xml_p_flags); //< Parse document by libxml2
     if(!xml) {
-        printerr(FEED_ERROR, "Unable to parse XML document from '%s'!", url);
+        printerr(FEED_ERROR, "Nepodarilo se provest analyzu dokumentu z '%s'!", url);
         return FEED_ERROR;
     }
 
     xmlNodePtr root = xmlDocGetRootElement(xml); //< Get The root element of XML doc
     if(!root) {
-        printerr(FEED_ERROR, "Unable to find root node of XML document from '%s'!", url);
+        printerr(FEED_ERROR, "Nepodarilo se najit korenovy prvek XML dokumentu z adresy '%s'!", url);
         xmlFreeDoc(xml);
         return FEED_ERROR;
     }

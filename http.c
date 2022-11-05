@@ -5,7 +5,7 @@
  * @note Uses opensll library
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 15. 10. 2022
+ * @date 5. 11. 2022
  */
 
 
@@ -60,13 +60,13 @@ int send_request(BIO *bio, url_t *p_url, char *url) {
 
     while((ret = BIO_write(bio, request_b, strlen(request_b))) <= 0) {
         if(!BIO_should_retry(bio)) { //< Checking if write should be repeated (in some cases is should be repeated even without SSL due to docs)
-            printerr(COMMUNICATION_ERROR, "Unable to send request to the '%s'!", url);
+            printerr(COMMUNICATION_ERROR, "Nepodarilo se odeslat HTTP zadost na '%s'!", url);
             return COMMUNICATION_ERROR;
         }
         else {
             ret = poll(&pfd, 1, TIMEOUT_MS);
             if(ret && !(pfd.revents & POLLIN)) {
-                printerr(COMMUNICATION_ERROR, "Unable to send request to the '%s'!", url);
+                printerr(COMMUNICATION_ERROR, "Nepodarilo se odeslat HTTP zadost na '%s'!", url);
                 return COMMUNICATION_ERROR;
             }
         }
@@ -95,13 +95,13 @@ int rec_response(BIO *bio, string_t *resp_b, char *url) {
                     break;
                 }
                 
-                printerr(COMMUNICATION_ERROR, "Unable to get response from the '%s'!", url);
+                printerr(COMMUNICATION_ERROR, "Nepodarilo se ziskat HTTP odpoved od '%s'!", url);
                 return COMMUNICATION_ERROR;
             }
             else { //< Read can be retried -> try it again (using poll)
                 ret = poll(&pfd, 1, TIMEOUT_MS);
                 if(ret && !(pfd.revents & POLLIN)) {
-                    printerr(COMMUNICATION_ERROR, "Unable to get response from the '%s'!", url);
+                    printerr(COMMUNICATION_ERROR, "Nepodarilo se ziskat HTTP odpoved od '%s'!", url);
                     return COMMUNICATION_ERROR;
                 }
             }
@@ -110,7 +110,7 @@ int rec_response(BIO *bio, string_t *resp_b, char *url) {
         total_b += ret;
         if(resp_b->size == total_b) { //< Response is in whole buffer => extend it and try to read again
             if(!(resp_b = ext_string(resp_b))) {
-                printerr(INTERNAL_ERROR, "Error while expanding buffer for response!");
+                printerr(INTERNAL_ERROR, "Chyba pri rozsirovani pameti pro HTTP odpoved!");
                 return INTERNAL_ERROR;
             }
         }
@@ -138,7 +138,7 @@ int load_verify_paths(SSL_CTX *ctx, settings_t *s) {
         memset(&stat_s, 0, sizeof(struct stat));
 
         if(stat(s->certaddr, &stat_s) || !S_ISDIR(stat_s.st_mode)) {
-            printerr(PATH_ERROR, "Given path '%s' does not lead to the folder!", s->certaddr);
+            printerr(PATH_ERROR, "Zadana cesta '%s' nevede ke slozce!", s->certaddr);
             return PATH_ERROR;
         }
     }
@@ -152,8 +152,8 @@ int load_verify_paths(SSL_CTX *ctx, settings_t *s) {
     }
    
     if(ret == 0) { //< Setting of paths was not succesful
-        const char *appendix = s->certfile || s->certaddr ? "Please check given paths!" : "";
-        printerr(PATH_ERROR, "Unable to set paths to certificate files! %s", appendix);
+        const char *appendix = s->certfile || s->certaddr ? "Prosim, zkontrolujte cesty!" : "";
+        printerr(PATH_ERROR, "Nepodarilo se nastavit cesty pro overeni certifikatu! %s", appendix);
         return PATH_ERROR;
     }
 
@@ -177,7 +177,7 @@ int https_load(url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
     BIO *bio = BIO_new_ssl_connect(ctx);
     BIO_get_ssl(bio, &ssl);
     if(!ssl) {
-        printerr(INTERNAL_ERROR, "Unable to allocate SSL!");
+        printerr(INTERNAL_ERROR, "Chyba pri alokaci SSL struktury!");
         SSL_CTX_free(ctx);
         return INTERNAL_ERROR;
     }
@@ -186,7 +186,7 @@ int https_load(url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
     //End of code based on https://developer.ibm.com/tutorials/l-openssl/
 
     if(!SSL_set_tlsext_host_name(ssl, p_url->url_parts[HOST]->str)) { //< Set Server Name Indication (if it is missing, self signed certificate error can occur)
-        printerr(INTERNAL_ERROR, "Unable to set SNI!");
+        printerr(INTERNAL_ERROR, "Chyba pri nastavovani SNI!");
         free_https_connection(bio, ctx);
         return INTERNAL_ERROR;
     }
@@ -195,13 +195,13 @@ int https_load(url_t *p_url, string_t *resp_b, char *url, settings_t *s) {
     BIO_set_conn_port(bio, p_url->url_parts[PORT_PART]->str); //< -||-
 
     if(BIO_do_connect(bio) <= 0) { //< Perform handshake
-        printerr(CONNECTION_ERROR, "Cannot connect to the '%s'!", url);
+        printerr(CONNECTION_ERROR, "Nelze se spojit s '%s'!", url);
         free_https_connection(bio, ctx);
         return CONNECTION_ERROR;
     }
 
     if((ret = SSL_get_verify_result(ssl)) != X509_V_OK) { //< Check verify result
-        printerr(VERIFICATION_ERROR, "Unable to verify certificate of '%s'! (%s)", url, X509_verify_cert_error_string(ret));
+        printerr(VERIFICATION_ERROR, "Nepodarilo se overit duveryhodnost certifikatu '%s'! (%s)", url, X509_verify_cert_error_string(ret));
         free_https_connection(bio, ctx);
         return VERIFICATION_ERROR;
     }
@@ -229,7 +229,7 @@ int http_load(url_t *parsed_url, string_t *resp_b, char *url) {
     int ret;
     BIO *bio = BIO_new(BIO_s_connect());
     if(!bio) {
-        printerr(INTERNAL_ERROR, "Unable to allocate BIO!");
+        printerr(INTERNAL_ERROR, "Chyba pri alokaci BIO struktury!");
         return INTERNAL_ERROR;
     }
 
@@ -237,7 +237,7 @@ int http_load(url_t *parsed_url, string_t *resp_b, char *url) {
     BIO_set_conn_port(bio, parsed_url->url_parts[PORT_PART]->str); //< -||-
 
     if(BIO_do_connect(bio) <= 0) {
-        printerr(CONNECTION_ERROR, "Cannot connect to the '%s'!", url);
+        printerr(CONNECTION_ERROR, "Nelze se spojit s '%s'!", url);
         BIO_free_all(bio);
         return CONNECTION_ERROR;
     }
@@ -267,10 +267,10 @@ int check_http_status(int status_c, string_t *phrase, char *url) {
         case 2: //< The class of Successful responses
             return SUCCESS;
         case 3: // The class of Redirection responses
-            printw("Got %s (code %d) from '%s'! Redirecting...", phrase->str, status_c, url);
+            printw("Odpoved %s (s kodem %d) z '%s'! Probiha presmerovani...", phrase->str, status_c, url);
             return HTTP_REDIRECT;
         default:
-            printerr(HTTP_ERROR, "Got %s (code %d) from '%s'! expected OK (200)", phrase->str, status_c, url);
+            printerr(HTTP_ERROR, "Odpoved %s (s kodem %d) z '%s'! Ocekavano OK (200)", phrase->str, status_c, url);
             return HTTP_ERROR;
     }
 }
@@ -278,13 +278,13 @@ int check_http_status(int status_c, string_t *phrase, char *url) {
 
 int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
     if(cur_url->indirect_lvl >= MAX_REDIR_NUM) {
-        printerr(HTTP_ERROR, "Maximum number of redirections (%d) was exceeded!", MAX_REDIR_NUM);
+        printerr(HTTP_ERROR, "Byl dosazen maximalni pocet presmerovani (%d)!", MAX_REDIR_NUM);
         return HTTP_ERROR;
     }
     else if(p_resp->location.st != NULL) {
         string_t *location_str = slice2string(&(p_resp->location));
         if(!location_str) {
-            printerr(INTERNAL_ERROR, "Unable to allocate memory for new URL!");
+            printerr(INTERNAL_ERROR, "Nepodarilo se alokovat pamet pro novou URL adresu!");
             return INTERNAL_ERROR;
         }
 
@@ -302,11 +302,11 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
 
         list_el_t *new_element = new_element_non_dup(location_str); //< Create new element for linked list with URLs
         if(!new_element) {
-            printerr(INTERNAL_ERROR, "Unable to create new URL for redirect from '%s'!", cur_url->string->str);
+            printerr(INTERNAL_ERROR, "Nepodarilo se vytvorit strukturu pro presmerovani z '%s'!", cur_url->string->str);
             return INTERNAL_ERROR;
         }
 
-        printw("Redirected to '%s'!", location_str->str);
+        printw("Presmerovano na '%s'!", location_str->str);
 
         new_element->result = SUCCESS;
         new_element->indirect_lvl = cur_url->indirect_lvl + 1; //< Increase redirection lvl (for safety reason)
@@ -314,7 +314,7 @@ int http_redirect(h_resp_t *p_resp, list_el_t *cur_url) {
         cur_url->next = new_element;
     }
     else {
-        printerr(HTTP_ERROR, "Unable to redirect, because Location header was not found!");
+        printerr(HTTP_ERROR, "Presmerovani se nepodarilo! Hlavicka Location nebyla nalezena v HTTP odpovedi!");
         return HTTP_ERROR;
     }
 
@@ -362,7 +362,7 @@ int prepare_mime_patterns(regex_t *regexes) {
 
     for(int i = 0; i < MIME_NUM; i++) {
         if(regcomp(&(regexes[i]), patterns[i], REG_EXTENDED | REG_ICASE)) { //< We will need extended posix notation and case insensitive matching 
-            printerr(INTERNAL_ERROR, "Invalid compilation of MIME regexes! %d", i);
+            printerr(INTERNAL_ERROR, "Chyba pri kompilaci regularniho vyrazu! %d", i);
             return INTERNAL_ERROR;
         }
     }
@@ -386,7 +386,7 @@ int find_mime(h_resp_t *p_resp, char *url) {
 
     string_t *content_type = slice2string(&(p_resp->content_type)); //Temporary string
     if(!content_type) {
-        printerr(INTERNAL_ERROR, "Unable to allocate temporary buffer for MIME type!");
+        printerr(INTERNAL_ERROR, "Nepodarilo se alokovat docasnou pamet pro MIME typ!");
         return INTERNAL_ERROR;
     }
 
@@ -402,7 +402,7 @@ int find_mime(h_resp_t *p_resp, char *url) {
     }
 
     if(ret != SUCCESS) {
-        printerr(HTTP_ERROR, "MIME type '%s' of document from '%s' is not supported!", content_type->str, url);
+        printerr(HTTP_ERROR, "MIME typ '%s' dokumentu z '%s' neni programem podporovan!", content_type->str, url);
     }
 
     free_all_patterns(re, MIME_NUM);
@@ -416,13 +416,13 @@ int find_mime(h_resp_t *p_resp, char *url) {
 int check_http_resp(h_resp_t *p_resp, list_el_t *cur_url, char *url) {
     string_t *status = slice2string(&(p_resp->status));
     if(!status) {
-        printerr(INTERNAL_ERROR, "Unable to allocate buffer for HTTP status code!");
+        printerr(INTERNAL_ERROR, "Nepodarilo se alokovat pamet pro status HTTP odpovedi!");
         return INTERNAL_ERROR;
     }
 
     string_t *phrase = slice2string(&(p_resp->phrase));
     if(!status) {
-        printerr(INTERNAL_ERROR, "Unable to allocate buffer for HTTP phrase!");
+        printerr(INTERNAL_ERROR, "Nepodarilo se alokovat pamet pro HTTP frazi!");
         return INTERNAL_ERROR;
     }
 
@@ -466,7 +466,7 @@ int prepare_resp_patterns(regex_t *regexes) {
     for(int i = 0; i < RE_H_RESP_NUM; i++) {
         int comp_flags = REG_EXTENDED | REG_NEWLINE | REG_ICASE; //< We will need extended posix notation and case insensitive matching (for better robustness) 
         if(regcomp(&(regexes[i]), patterns[i], comp_flags)) {
-            printerr(INTERNAL_ERROR, "Invalid compilation of response regexes! %d", i);
+            printerr(INTERNAL_ERROR, "Chyba pri kompilaci regulraniho vyrazu! %d", i);
             return INTERNAL_ERROR;
         }
     }
@@ -520,7 +520,7 @@ int parse_first_line(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *url) {
     *cursor = skip_w_spaces(*cursor, true);
     res[STAT] = regexec(&(regexes[STAT]), *cursor, 1, &(matches[STAT]), 0);
     if(res[STAT] == REG_NOMATCH) { //< The status field was found
-        printerr(HTTP_ERROR, "Unable to find status code in reponse from '%s'!", *cursor);
+        printerr(HTTP_ERROR, "Nepodarilo se najit kod HTTP odpovedi ('%s')!", url);
         return HTTP_ERROR;
     }
 
@@ -531,7 +531,7 @@ int parse_first_line(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *url) {
     *cursor = skip_w_spaces(*cursor, true);
     res[PHR] = regexec(&(regexes[PHR]), *cursor, 1, &(matches[PHR]), 0);
     if(res[PHR] == REG_NOMATCH) { //< Phrase field was found
-        printerr(HTTP_ERROR, "Unable to find status phrase in reponse from '%s'!", url);
+        printerr(HTTP_ERROR, "Nepodarilo se najit frazi odpovedi ('%s')!", url);
         return HTTP_ERROR;
     }
 
@@ -576,7 +576,7 @@ int parse_resp_headers(resp_parse_ctx_t *ctx, h_resp_t *p_resp, char *hdrs_start
     }
 
     if(line_no == 0 && ret == SUCCESS) { //Ther should be always at least initial line of headers
-        printerr(HTTP_ERROR, "Invalid headers of HTTP response from '%s' (missing initial header)!", url);
+        printerr(HTTP_ERROR, "Neplatne hlavicky HTTP odpovedi z adresy '%s' (chybi uvodni radek)!", url);
         ret = HTTP_ERROR;
     }
 
@@ -602,7 +602,7 @@ int parse_http_resp(h_resp_t *parsed_resp, string_t *response, char *url) {
     res[H_PART] = regexec(&regexes[H_PART], resp, 1, &(matches[H_PART]), 0);
 
     if(res[H_PART] == REG_NOMATCH) {
-        printerr(HTTP_ERROR, "Headers of HTTP response from '%s' was not found!", url); //< RFC7230 p. 34
+        printerr(HTTP_ERROR, "Hlavicky HTTP odpovedi z '%s' nebylo mozne najit!", url); //< RFC7230 p. 34
         ret = HTTP_ERROR;
     }
     else {

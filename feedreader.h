@@ -3,7 +3,7 @@
  * @brief Header file of main file of feedreader program
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 1. 11. 2022
+ * @date 5. 11. 2022
  */
 
 #include <stdio.h>
