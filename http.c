@@ -64,7 +64,7 @@ int send_request(BIO *bio, url_t *p_url, char *url) {
             return COMMUNICATION_ERROR;
         }
         else {
-            ret = poll(&pfd, 1, TIMEOUT_S);
+            ret = poll(&pfd, 1, TIMEOUT_MS);
             if(ret && !(pfd.revents & POLLIN)) {
                 printerr(COMMUNICATION_ERROR, "Unable to send request to the '%s'!", url);
                 return COMMUNICATION_ERROR;
@@ -99,7 +99,7 @@ int rec_response(BIO *bio, string_t *resp_b, char *url) {
                 return COMMUNICATION_ERROR;
             }
             else { //< Read can be retried -> try it again (using poll)
-                ret = poll(&pfd, 1, TIMEOUT_S);
+                ret = poll(&pfd, 1, TIMEOUT_MS);
                 if(ret && !(pfd.revents & POLLIN)) {
                     printerr(COMMUNICATION_ERROR, "Unable to get response from the '%s'!", url);
                     return COMMUNICATION_ERROR;

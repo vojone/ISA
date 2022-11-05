@@ -31,7 +31,7 @@
 
 #define HTTP_REDIRECT -1 //< Return value signalizing http redirection 
 #define MAX_REDIR_NUM 5 //< Maximum amount of redirections to prevent redirection cycle
-#define TIMEOUT_S 3000 //< Maximum time in ms for waiting for the writing/reading from BIO socket
+#define TIMEOUT_MS 3000 //< Maximum time in ms for waiting for the writing/reading from BIO socket
 
 #define HTTP_VERSION "HTTP/1.0" //< HTTP version (used in request)
 
