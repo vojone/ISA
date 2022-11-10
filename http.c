@@ -263,14 +263,16 @@ int http_load(url_t *parsed_url, string_t *resp_b, char *url) {
 
 
 int check_http_status(int status_c, string_t *phrase, char *url) {
+    if(status_c == 200) { //< The successful response
+        return SUCCESS;
+    }
+
     switch(status_c/100) {
-        case 2: //< The class of Successful responses
-            return SUCCESS;
         case 3: // The class of Redirection responses
-            printw("Odpoved %s (s kodem %d) z '%s'! Probiha presmerovani...", phrase->str, status_c, url);
+            printw("Ziskana odpoved '%s' (s kodem %d) z '%s'! Probiha presmerovani...", phrase->str, status_c, url);
             return HTTP_REDIRECT;
         default:
-            printerr(HTTP_ERROR, "Odpoved %s (s kodem %d) z '%s'! Ocekavano OK (200)", phrase->str, status_c, url);
+            printerr(HTTP_ERROR, "Ziskana odpoved '%s' (s kodem %d) z '%s'! Ocekavano 'OK' (200)", phrase->str, status_c, url);
             return HTTP_ERROR;
     }
 }
