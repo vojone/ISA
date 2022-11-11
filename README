@@ -4,7 +4,7 @@
 Vojtěch Dvořák (xdvora3o)
 
 ## Creation date
-5. 11. 2022
+11. 11. 2022
 
 ## About
 Reader of news in Atom/RSS2.0 format with TLS support. Reads XML documents specified by URLs and prints their content in format defined by the project assignment. It is designed to be robust and modular. For details see `manual.pdf`.
@@ -55,9 +55,9 @@ Program is also dependent on these libraries:
 
 `libxml2` - necessary for parsing XML (see `feed` module)
 
-`openssl` - it is used for fetching data through HTTP(S)
+`openssl` - it is used for fetching data through HTTP(S) (see `http` module)
 
-For testing it is neccessary to have `bash` installed.
+For testing it is neccessary to have `bash` installed (and optionally `valgrind` to perform check of memory leaks etc.).
 
 ## Usage
 Use `make` (or `make debug`) command to compile the program and create the binary. Then test of the program can be executed by `make test` or it can be executed by following scheme: 
@@ -77,7 +77,7 @@ Options:
 
 - `-C certaddr`   Defines path to the folder with certificates, that will be used for verification of server certificate (there may be need tu run c_rehash utility above `certaddr` first)
 
-- `-T`  Activates priting of last update time
+- `-T`  Activates priting of the last update time
 
 - `-a`  Activates printing of author name  
 
