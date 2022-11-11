@@ -1,2 +1,2 @@
-#Reading multiple sources (Atom and RSS)
--f "feedfile"
+#Simple reading from real RSS source (HTTP)
+"http://rss.cnn.com/rss/cnn_topstories.rss"

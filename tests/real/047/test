@@ -1,2 +1,2 @@
-#Reading multiple sources (Atom and RSS)
--f "feedfile2" -T -u -a
+#Real RSS src with cert (cert of the root CA, until 2029)
+https://rss.art19.com/apology-line -c "rss-art19-com.pem"

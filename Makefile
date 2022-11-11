@@ -24,7 +24,7 @@ IN_ARCHIVE = $(SRCS) $(HEADERS) README Makefile \
 $(TEST_SCRIPT_NAME) $(TEST_FOLDER_NAME) tests_serverside manual.pdf
 
 
-.PHONY: all feedreader debug clean
+.PHONY: all debug clean tar test
 
 all: $(APP_NAME)
 

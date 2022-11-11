@@ -1,2 +1,2 @@
-#Real RSS with fake cert
-https://rss.art19.com/apology-line -c "fake-cert.pem"
+#Reading RSS with specified cert (valid until Sep 2040)
+https://cdn.feedcontrol.net/8/1114-wioSIX3uu8MEj.xml -c feedcontrol-net.pem

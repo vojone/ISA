@@ -5,7 +5,7 @@
  * @note Uses opensll library
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 5. 11. 2022
+ * @date 11. 11. 2022
  */
 
 
@@ -468,7 +468,7 @@ int prepare_resp_patterns(regex_t *regexes) {
     for(int i = 0; i < RE_H_RESP_NUM; i++) {
         int comp_flags = REG_EXTENDED | REG_NEWLINE | REG_ICASE; //< We will need extended posix notation and case insensitive matching (for better robustness) 
         if(regcomp(&(regexes[i]), patterns[i], comp_flags)) {
-            printerr(INTERNAL_ERROR, "Chyba pri kompilaci regulraniho vyrazu! %d", i);
+            printerr(INTERNAL_ERROR, "Chyba pri kompilaci regularniho vyrazu! %d", i);
             return INTERNAL_ERROR;
         }
     }

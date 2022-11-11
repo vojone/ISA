@@ -37,6 +37,7 @@ VALGRIND_LOG_FILE_NAME="valgrind.tmp"
 
 VERBOSE=0 # Default value of verbose
 MEMCHECK=0 # Default value of memcheck
+ALL_TESTS=0
 
 PASSED_MSG="[ \033[0;32mPASSED\033[0m ]"
 FAILED_MSG="[ \033[0;31mFAILED\033[0m ]"
@@ -52,7 +53,7 @@ TOTAL_NUM=0
 
 # Parse options
 function parse_options() {
-    while getopts "vmht:p:" OPT
+    while getopts "vmhat:p:" OPT
     do
         if [ "$OPT" = "v" ]
         then
@@ -72,10 +73,12 @@ function parse_options() {
             echo -e "-h\tPrints help and ends program"
             echo -e "-t test1\tRuns only test in 'test1' folder"
             echo -e "-p path\tSpecifies the path to the program to be tested"
+            echo -e "-a\tRun all the tests, do not skip the hidden test cases (suffix '_')"
             echo
             echo "Return codes:"
             echo "0 - All tests passed"
             echo "1 - There are failed tests"
+            echo "2 - Errors ocurred inside test script"
             exit 0
         elif [ "$OPT" = "p" ]
         then
@@ -83,6 +86,9 @@ function parse_options() {
         elif [ "$OPT" = "t" ]
         then
             TEST_TO_BE_EXEC=$OPTARG
+        elif [ "$OPT" = "a" ]
+        then
+            ALL_TESTS=1
         fi
     done
 }
@@ -120,6 +126,11 @@ function test_exec() {
                 VALID_FOLDER=1
 
                 if [[ "$TEST_TO_BE_EXEC" != "" &&  "$TEST_TO_BE_EXEC" != "${TEST#$1}" ]] 
+                then
+                    continue
+                fi
+                
+                if [[ "${TEST: -1: 1}" == "_" && $ALL_TESTS == 0 ]] # Skip "hidden" tests
                 then
                     continue
                 fi

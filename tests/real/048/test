@@ -1,2 +1,2 @@
-#Feedfile from assignment (8 various sources)
--f feedfileAssignment
+#Real RSS with fake cert
+https://rss.art19.com/apology-line -c "fake-cert.pem"
