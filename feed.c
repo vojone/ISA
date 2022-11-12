@@ -4,7 +4,7 @@
  * RSS2/Atom feeds)
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 5. 11. 2022 
+ * @date 12. 11. 2022 
  */
 
 #include "feed.h"
@@ -21,6 +21,7 @@ void xml_parser_cleanup() {
 
 
 void init_feed_doc(feed_doc_t *feed_doc) {
+    feed_doc->def_auth_name = NULL;
     feed_doc->src_name = NULL;
     feed_doc->feed = NULL;
 }
@@ -65,6 +66,7 @@ void feed_dtor(feed_el_t *feed) {
 
 
 void feed_doc_dtor(feed_doc_t *feed_doc) {
+    if(feed_doc->def_auth_name) xmlFree(feed_doc->def_auth_name);
     if(feed_doc->src_name) xmlFree(feed_doc->src_name);
 
     feed_el_t *feed = feed_doc->feed, *tmp;
@@ -124,7 +126,7 @@ int set_feed_field(xmlChar **field, xmlChar *new_content, const char *tag) {
  * @param cur_feed The ptr to the structure, that should be filled with author name
  * @return SUCCESS if everything went OK (even if the name of the author was not found)  
  */
-int parse_atom_author(xmlNodePtr author, feed_el_t *cur_feed) {
+int parse_atom_author(xmlNodePtr author, xmlChar **field) {
     int ret = SUCCESS;
     
     xmlNodePtr sub_child = author->children;
@@ -133,7 +135,7 @@ int parse_atom_author(xmlNodePtr author, feed_el_t *cur_feed) {
         xmlChar *sub_content = xmlNodeGetContent(sub_child);
 
         if(hasName(sub_child, "name")) {
-            ret = set_feed_field(&(cur_feed->auth_name), sub_content, "name");
+            ret = set_feed_field(field, sub_content, "name");
         }
         else {
             if(sub_content) xmlFree(sub_content);
@@ -192,7 +194,7 @@ int parse_atom_entry(feed_el_t *cur_feed, xmlNodePtr entry) {
             if(content) xmlFree(content);
         }
         else if(hasName(child, "author")) { //< Go inside author tag (there can be name and email)
-            ret = parse_atom_author(child, cur_feed);
+            ret = parse_atom_author(child, &(cur_feed->auth_name));
             if(content) xmlFree(content);
         }
         else {
@@ -221,29 +223,43 @@ int parse_atom(xmlNodePtr root, feed_doc_t *feed_doc) {
     feed_el_t *cur_feed;
     xmlNodePtr root_child = root->children;
 
-    while(root_child) { //< Perform search in root child
-        xmlChar *content = xmlNodeGetContent(root_child); //< Get content of child (it can be NULL)
-
-        if(hasName(root_child, "title")) {
-            ret = set_feed_field(&(feed_doc->src_name), content, "title");
+    if(hasName(root, "entry")) { //< For standalone entry documents (see RFC4287 p. 26)
+        if(!(cur_feed = new_feed(feed_doc))) {
+            printerr(INTERNAL_ERROR, "Nepodarilo se alokovat strukturu pro novinku!");
+            return INTERNAL_ERROR;
         }
-        else if(hasName(root_child, "entry")) { //< Entry was found
-            if(!(cur_feed = new_feed(feed_doc))) {
-                printerr(INTERNAL_ERROR, "Nepodarilo se alokovat strukturu pro novinku!");
-                return INTERNAL_ERROR;
+        
+        ret = parse_atom_entry(cur_feed, root); //< Parse it
+    }
+    else { //< Typical atom source
+        while(root_child) { //< Perform search in root child
+            xmlChar *content = xmlNodeGetContent(root_child); //< Get content of child (it can be NULL)
+
+            if(hasName(root_child, "title")) {
+                ret = set_feed_field(&(feed_doc->src_name), content, "title");
             }
-            
-            ret = parse_atom_entry(cur_feed, root_child); //< Parse it
-            if(content) xmlFree(content);
-        }
-        else {
-            if(content) xmlFree(content);
-        }
-        if(ret != SUCCESS) {
-            break;
-        }       
+            else if(hasName(root_child, "author")) { //< Default author is set (see RFC4287 p. 17)
+                ret = parse_atom_author(root_child, &(feed_doc->def_auth_name));
+                if(content) xmlFree(content);
+            }
+            else if(hasName(root_child, "entry")) { //< Entry was found
+                if(!(cur_feed = new_feed(feed_doc))) {
+                    printerr(INTERNAL_ERROR, "Nepodarilo se alokovat strukturu pro novinku!");
+                    return INTERNAL_ERROR;
+                }
+                
+                ret = parse_atom_entry(cur_feed, root_child); //< Parse it
+                if(content) xmlFree(content);
+            }
+            else {
+                if(content) xmlFree(content);
+            }
+            if(ret != SUCCESS) {
+                break;
+            }       
 
-        root_child = root_child->next; //< Go to the next child of the root node
+            root_child = root_child->next; //< Go to the next child of the root node
+        }
     }
 
     return ret;
@@ -355,7 +371,7 @@ int parse_rss(xmlNodePtr root, feed_doc_t *feed_doc) {
 int sel_parser(xmlNodePtr root, int exp_type, char *url, parse_f_ptr_t *func) {
     int real_mime;
 
-    if(hasName(root, "feed")) {
+    if(hasName(root, "feed") || hasName(root, "entry")) {
         real_mime = ATOM;
         *func = parse_atom;
     }
@@ -365,7 +381,7 @@ int sel_parser(xmlNodePtr root, int exp_type, char *url, parse_f_ptr_t *func) {
     }
     else {
         #ifdef FORMAT_STRICT
-            printerr(FEED_ERROR, "Neocekavany nazev korenove znacky XML z '%s'! Ocekavano 'feed'/'rss'", url);
+            printerr(FEED_ERROR, "Neocekavany nazev korenove znacky XML z '%s'! Ocekavano 'feed'/'rss'/'entry'", url);
             return FEED_ERROR;
         #endif
     }
@@ -429,6 +445,11 @@ void print_feed_doc(feed_doc_t *feed_doc, settings_t *settings) {
         if(is_known(feed->auth_name) && settings->author_flag) {
             printf("Autor: %s\n", feed->auth_name);
         }
+        else if(is_known(feed_doc->def_auth_name) && settings->author_flag) {
+            printf("Autor: %s\n", feed_doc->def_auth_name);
+        }
+
+
         if(is_known(feed->url) && settings->asoc_url_flag) {
             printf("URL: %s\n", feed->url);
         }

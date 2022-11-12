@@ -5,7 +5,7 @@
  * @note Uses libxml2 library to parse XML docs
  * 
  * @author Vojtěch Dvořák (xdvora3o)
- * @date 5. 11. 2022 
+ * @date 12. 11. 2022 
  */
 
 #ifndef _FEEDREADER_FEED_
@@ -42,7 +42,7 @@ typedef struct feed_el {
  * 
  */
 typedef struct feed_doc {
-    xmlChar *src_name; //< Name of the feed doc
+    xmlChar *src_name, *def_auth_name; //< Name of the feed doc
     feed_el_t *feed; //< Ptr to the first feed entry
 } feed_doc_t;
 

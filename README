@@ -4,7 +4,7 @@
 Vojtěch Dvořák (xdvora3o)
 
 ## Creation date
-11. 11. 2022
+12. 11. 2022
 
 ## About
 Reader of news in Atom/RSS2.0 format with TLS support. Reads XML documents specified by URLs and prints their content in format defined by the project assignment. It is designed to be robust and modular. For details see `manual.pdf`.
